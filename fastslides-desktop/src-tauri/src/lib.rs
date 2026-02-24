@@ -27,12 +27,43 @@ const DEFAULT_AGENT_HOOK_ADDR: &str = "127.0.0.1:38473";
 const MENU_EXPORT_SKILL_ID: &str = "menu.export_fastslides_skill";
 const MENU_EXPORT_SKILL_EVENT: &str = "fastslides://export-skill";
 const DEFAULT_SLIDES_CSS: &str = "\
-/* slides.css — custom slide styles for this project.
-   Rules here are injected into the preview and override defaults.
-   Example:
-   .slide { background: #1a1a2e; border-radius: 12px; }
-   .slide h1 { color: #e2e8f0; }
+/* ═══ slides.css ═══
+   Per-project slide design tokens.
+   Edit the custom properties below to customise slide appearance.
+   Changes are picked up by the preview whenever settings are saved
+   or the project is re-selected. Agents can also edit this file
+   directly on disk.
 */
+
+:root {
+  /* ── Layout ── */
+  --slide-bg: #0e0d0a;
+  --slide-border: rgba(239, 239, 235, 0.12);
+  --slide-radius: 10px;
+  --slide-padding: 32px;
+
+  /* ── Typography ── */
+  --slide-font-family: \"Inter\", system-ui, sans-serif;
+  --slide-heading-font: var(--slide-font-family);
+  --slide-code-font: \"Fira Code\", monospace;
+
+  /* ── Colors ── */
+  --slide-fg: #edecec;
+  --slide-h1-color: #ffffff;
+  --slide-h2-color: #d7d6d5;
+  --slide-h3-color: #b0afab;
+  --slide-body-color: #c4c3bf;
+  --slide-accent: #7b9cbc;
+  --slide-link-color: var(--slide-accent);
+  --slide-code-bg: rgba(255, 255, 255, 0.06);
+
+  /* ── Palette (charts / diagrams / highlights) ── */
+  --slide-palette-1: #7b9cbc;
+  --slide-palette-2: #63b18a;
+  --slide-palette-3: #e1b86f;
+  --slide-palette-4: #d68080;
+  --slide-palette-5: #b08cd6;
+}
 ";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

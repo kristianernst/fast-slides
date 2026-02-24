@@ -1412,13 +1412,15 @@ export default function Home() {
               {selectedProject && (
                 <div className="settings-section">
                   <span className="settings-label">Slide Styles</span>
-                  <p className="settings-hint">slides.css for {selectedProject.name}</p>
+                  <p className="settings-hint">
+                    slides.css for {selectedProject.name} — edit --slide-* variables
+                  </p>
                   <textarea
                     className="css-editor"
                     value={cssEditorValue}
                     onChange={(e) => setCssEditorValue(e.target.value)}
                     spellCheck={false}
-                    placeholder=".slide { background: #1a1a2e; }"
+                    placeholder={":root {\n  --slide-bg: #1a1a2e;\n  --slide-h1-color: #e2e8f0;\n}"}
                   />
                   <button
                     type="button"

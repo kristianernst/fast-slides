@@ -241,14 +241,18 @@
 }
 
 [data-theme="light"] .embedded-preview-deck .slide {
-  border-color: rgba(27, 25, 19, 0.1);
-  background: #ffffff;
-  color: #1b1913;
+  border-color: var(--slide-border, rgba(27, 25, 19, 0.1));
+  background: var(--slide-bg, #ffffff);
+  color: var(--slide-fg, #1b1913);
 }
 
 [data-theme="light"] .embedded-preview-deck p,
 [data-theme="light"] .embedded-preview-deck li {
-  color: #5a5955;
+  color: var(--slide-body-color, #5a5955);
+}
+
+[data-theme="light"] .embedded-preview-deck code {
+  background: var(--slide-code-bg, rgba(0, 0, 0, 0.05));
 }
 
 [data-theme="light"] .project-row:hover .project-title,
@@ -957,11 +961,12 @@ textarea {
 .embedded-preview-deck .slide {
   width: min(100%, 1280px);
   min-height: 720px;
-  border: 1px solid rgba(239, 239, 235, 0.12);
-  border-radius: var(--radius-lg);
-  background: rgba(14, 13, 10, 0.88);
-  padding: 32px;
-  color: var(--color-text-primary);
+  border: 1px solid var(--slide-border, rgba(239, 239, 235, 0.12));
+  border-radius: var(--slide-radius, 10px);
+  background: var(--slide-bg, rgba(14, 13, 10, 0.88));
+  padding: var(--slide-padding, 32px);
+  color: var(--slide-fg, var(--color-text-primary));
+  font-family: var(--slide-font-family, inherit);
 }
 
 .preview-stage.single-slide-mode .embedded-preview-deck .slide {
@@ -993,11 +998,35 @@ textarea {
 .embedded-preview-deck h2,
 .embedded-preview-deck h3 {
   margin-top: 0;
+  font-family: var(--slide-heading-font, var(--slide-font-family, inherit));
 }
+
+.embedded-preview-deck h1 { color: var(--slide-h1-color, inherit); }
+.embedded-preview-deck h2 { color: var(--slide-h2-color, inherit); }
+.embedded-preview-deck h3 { color: var(--slide-h3-color, inherit); }
 
 .embedded-preview-deck p,
 .embedded-preview-deck li {
-  color: var(--sidebar-text-secondary);
+  color: var(--slide-body-color, var(--sidebar-text-secondary));
+}
+
+.embedded-preview-deck a {
+  color: var(--slide-link-color, var(--slide-accent, #7b9cbc));
+}
+
+.embedded-preview-deck code {
+  font-family: var(--slide-code-font, var(--font-mono));
+  background: var(--slide-code-bg, rgba(255, 255, 255, 0.06));
+  padding: 0.15em 0.4em;
+  border-radius: var(--radius-xs);
+  font-size: 0.9em;
+}
+
+.embedded-preview-deck pre code {
+  display: block;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
 }
 
 .embedded-preview-deck img {
@@ -1024,7 +1053,12 @@ textarea {
 .empty-logo {
   width: min(180px, 24vw);
   height: auto;
-  opacity: 0.95;
+  opacity: 0.9;
+}
+
+[data-theme="light"] .empty-logo {
+  filter: brightness(0);
+  opacity: 0.75;
 }
 
 .empty-center p {
