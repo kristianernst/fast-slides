@@ -1,0 +1,4 @@
+interface:
+  display_name: "FastSlides"
+  short_description: "Desktop-first MDX deck workflow"
+  default_prompt: "Use $fastslides with scripts/fastslides.sh to start the desktop app, verify hook health, open/validate projects, and iterate on page.mdx + assets." 

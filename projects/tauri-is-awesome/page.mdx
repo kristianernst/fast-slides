@@ -1,0 +1,123 @@
+---
+project: "tauri-is-awesome"
+title: "Tauri Is Awesome"
+subtitle: "Small binaries, native power"
+date: "February 2026"
+---
+<main className="deck">
+
+<section className="slide">
+
+# Tauri Is Awesome
+
+<div className="flex flex-col h-full justify-center">
+  <div className="text-6xl font-extrabold text-neutral-900 mb-6">Small binaries, native power</div>
+  <div className="text-2xl text-neutral-500">FastSlides desktop demo</div>
+</div>
+
+</section>
+
+<section className="slide">
+
+# Why teams pick Tauri
+
+<div className="split">
+  <div className="col prose-compact">
+
+  - Tiny install size and fast startup.
+  - Native OS integration without shipping Chromium.
+  - Great fit for utilities, internal tools, and agent workflows.
+
+  </div>
+  <div className="col prose-compact">
+
+  ## Stack
+
+  - Rust backend commands
+  - Web UI (React/Next/Svelte/etc.)
+  - One codebase, native desktop behaviors
+
+  </div>
+</div>
+
+</section>
+
+<section className="slide">
+
+# Architecture in one minute
+
+<div className="split">
+  <div className="col prose-compact">
+
+  1. UI renders in a lightweight webview.
+  2. Secure Rust commands handle filesystem + OS features.
+  3. IPC keeps the boundary explicit and auditable.
+
+  </div>
+  <div className="col prose-compact">
+
+  ## What this gives you
+
+  - Better performance profile
+  - Lower memory footprint
+  - Easier hardening of critical paths
+
+  </div>
+</div>
+
+</section>
+
+<section className="slide">
+
+# FastSlides desktop use case
+
+<div className="split">
+  <div className="col prose-compact">
+
+  - Open any folder containing `page.mdx`.
+  - Track projects in-app.
+  - Resize and collapse sidebar for focus.
+  - Render live slide preview inside desktop UI.
+
+  </div>
+  <div className="col prose-compact">
+
+  ## Agent-ready workflow
+
+  - Local FastSlides hook API for app state + preview URL.
+  - Agent edits MDX, then validates and previews.
+  - Screenshot QA loop for fast visual iteration.
+
+  </div>
+</div>
+
+</section>
+
+<section className="slide">
+
+# Demo flow
+
+<div className="prose-compact">
+
+1. Initialize project with `init_deck_project.sh`.
+2. Start preview service.
+3. Launch FastSlides desktop app.
+4. Open project and render preview.
+5. Iterate with agent + screenshots until polished.
+
+</div>
+
+</section>
+
+<section className="slide">
+
+# Takeaway
+
+<div className="flex flex-col h-full justify-center">
+  <div className="text-5xl font-bold text-neutral-900 mb-6">Tauri gives web teams native reach with fewer tradeoffs.</div>
+  <div className="text-2xl text-neutral-500">FastSlides shows the pattern: Rust core + web UI + agent hooks.</div>
+</div>
+
+</section>
+
+</main>
