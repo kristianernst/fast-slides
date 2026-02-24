@@ -18,8 +18,11 @@ import {
   CloseCircle,
   Maximize,
   Minimize,
+  Moon,
   Pin,
+  Settings,
   SidebarMinimalistic,
+  Sun,
 } from "@solar-icons/react";
 
 type AppConfig = {
@@ -98,6 +101,7 @@ async function pickFolder(title: string): Promise<string> {
 const SELECTED_STATE_KEY = "fastslides_selected_path";
 const SIDEBAR_WIDTH_STATE_KEY = "fastslides_sidebar_width";
 const PINNED_STATE_KEY = "fastslides_pinned_paths";
+const THEME_STATE_KEY = "fastslides_theme";
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 420;
 const EXPORT_SKILL_MENU_EVENT = "fastslides://export-skill";
@@ -459,6 +463,16 @@ export default function Home() {
   const [previewDockVisible, setPreviewDockVisible] = useState(true);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [busy, setBusy] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(THEME_STATE_KEY);
+      if (stored === "light") return "light";
+    }
+    return "dark";
+  });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [projectCss, setProjectCss] = useState("");
+  const [cssEditorValue, setCssEditorValue] = useState("");
   const sidebarResizeCleanupRef = useRef<(() => void) | null>(null);
   const previewDockHideTimerRef = useRef<number | null>(null);
   const previewDockHoveringRef = useRef(false);
@@ -522,6 +536,13 @@ export default function Home() {
       localStorage.setItem(PINNED_STATE_KEY, JSON.stringify(pinnedPaths));
     }
   }, [pinnedPaths]);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(THEME_STATE_KEY, theme);
+    }
+  }, [theme]);
 
   const projects = appState?.projects || [];
   useEffect(() => {
@@ -629,6 +650,41 @@ export default function Home() {
       cancelled = true;
     };
   }, [selectedProject?.path]);
+
+  useEffect(() => {
+    if (!selectedProject) {
+      setProjectCss("");
+      setCssEditorValue("");
+      return;
+    }
+    let cancelled = false;
+    call<string>("read_project_css", { path: selectedProject.path })
+      .then((css) => {
+        if (!cancelled) {
+          setProjectCss(css);
+          setCssEditorValue(css);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setProjectCss("");
+          setCssEditorValue("");
+        }
+      });
+    return () => { cancelled = true; };
+  }, [selectedProject?.path]);
+
+  useEffect(() => {
+    const id = "fastslides-project-css";
+    let style = document.getElementById(id) as HTMLStyleElement | null;
+    if (!style) {
+      style = document.createElement("style");
+      style.id = id;
+      document.head.appendChild(style);
+    }
+    style.textContent = projectCss;
+    return () => { style?.remove(); };
+  }, [projectCss]);
 
   useEffect(() => {
     if (previewDockHideTimerRef.current !== null) {
@@ -852,6 +908,12 @@ export default function Home() {
         return;
       }
 
+      if (event.key === "Escape" && settingsOpen) {
+        event.preventDefault();
+        setSettingsOpen(false);
+        return;
+      }
+
       if (event.key === "Escape" && presenterMode) {
         event.preventDefault();
         setPresenterMode(false);
@@ -882,7 +944,7 @@ export default function Home() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [activeSlideIndex, maxSlideIndex, presenterMode, selectedProject]);
+  }, [activeSlideIndex, maxSlideIndex, presenterMode, selectedProject, settingsOpen]);
 
   function clearPreviewDockHideTimer(): void {
     if (previewDockHideTimerRef.current !== null) {
@@ -1001,6 +1063,14 @@ export default function Home() {
         return previous.filter((candidate) => candidate !== path);
       }
       return [path, ...previous];
+    });
+  }
+
+  async function handleSaveCss(): Promise<void> {
+    if (!selectedProject) return;
+    await withBusy(async () => {
+      await call<void>("save_project_css", { path: selectedProject.path, css: cssEditorValue });
+      setProjectCss(cssEditorValue);
     });
   }
 
@@ -1190,6 +1260,17 @@ export default function Home() {
             )}
           </ul>
         </section>
+
+        <footer className="sidebar-foot">
+          <button
+            type="button"
+            className="settings-trigger"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Settings"
+          >
+            <Settings size={16} weight="Linear" />
+          </button>
+        </footer>
       </aside>
 
       <div
@@ -1292,6 +1373,66 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {settingsOpen && (
+        <div className="settings-overlay" onClick={() => setSettingsOpen(false)}>
+          <div className="settings-dialog" onClick={(e) => e.stopPropagation()}>
+            <header className="settings-header">
+              <h2>Settings</h2>
+              <button
+                type="button"
+                className="settings-close"
+                onClick={() => setSettingsOpen(false)}
+                aria-label="Close settings"
+              >
+                <CloseCircle size={16} weight="Linear" />
+              </button>
+            </header>
+            <div className="settings-body">
+              <div className="settings-section">
+                <span className="settings-label">Theme</span>
+                <div className="theme-toggle">
+                  <button
+                    type="button"
+                    className={theme === "dark" ? "active" : ""}
+                    onClick={() => setTheme("dark")}
+                  >
+                    <Moon size={14} weight="Linear" /> Dark
+                  </button>
+                  <button
+                    type="button"
+                    className={theme === "light" ? "active" : ""}
+                    onClick={() => setTheme("light")}
+                  >
+                    <Sun size={14} weight="Linear" /> Light
+                  </button>
+                </div>
+              </div>
+              {selectedProject && (
+                <div className="settings-section">
+                  <span className="settings-label">Slide Styles</span>
+                  <p className="settings-hint">slides.css for {selectedProject.name}</p>
+                  <textarea
+                    className="css-editor"
+                    value={cssEditorValue}
+                    onChange={(e) => setCssEditorValue(e.target.value)}
+                    spellCheck={false}
+                    placeholder=".slide { background: #1a1a2e; }"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={() => void handleSaveCss()}
+                    disabled={busy}
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -26,6 +26,14 @@ const DEFAULT_PREVIEW_BASE_URL: &str = "http://127.0.0.1:34773";
 const DEFAULT_AGENT_HOOK_ADDR: &str = "127.0.0.1:38473";
 const MENU_EXPORT_SKILL_ID: &str = "menu.export_fastslides_skill";
 const MENU_EXPORT_SKILL_EVENT: &str = "fastslides://export-skill";
+const DEFAULT_SLIDES_CSS: &str = "\
+/* slides.css — custom slide styles for this project.
+   Rules here are injected into the preview and override defaults.
+   Example:
+   .slide { background: #1a1a2e; border-radius: 12px; }
+   .slide h1 { color: #e2e8f0; }
+*/
+";
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct AppConfig {
@@ -987,6 +995,8 @@ fn create_project(
         date_label.as_deref().unwrap_or(DEFAULT_DATE_LABEL),
     );
     write_page_mdx(&project_path, &starter)?;
+    fs::write(project_path.join("slides.css"), DEFAULT_SLIDES_CSS)
+        .map_err(|error| format!("Failed to create slides.css: {error}"))?;
 
     let mut config = normalized_config(load_config()?);
     remember_recent_project(&mut config, &project_path);
@@ -1170,6 +1180,25 @@ fn export_fastslides_skill(destination: String) -> Result<String, String> {
     }
 
     Ok(path_to_string(&destination_path))
+}
+
+#[tauri::command]
+fn read_project_css(path: String) -> Result<String, String> {
+    let project_dir = normalize_existing_project_directory(&path)?;
+    let css_path = project_dir.join("slides.css");
+    if !css_path.exists() {
+        return Ok(String::new());
+    }
+    fs::read_to_string(&css_path)
+        .map_err(|error| format!("Failed to read {}: {error}", css_path.display()))
+}
+
+#[tauri::command]
+fn save_project_css(path: String, css: String) -> Result<(), String> {
+    let project_dir = normalize_existing_project_directory(&path)?;
+    let css_path = project_dir.join("slides.css");
+    fs::write(&css_path, &css)
+        .map_err(|error| format!("Failed to write {}: {error}", css_path.display()))
 }
 
 fn build_app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -1387,9 +1416,11 @@ pub fn run() {
             open_project,
             open_in_file_manager,
             export_fastslides_skill,
+            read_project_css,
             remove_project,
             remove_projects_root,
             save_project,
+            save_project_css,
             resolve_project_asset_data_url,
             validate_project
         ])
