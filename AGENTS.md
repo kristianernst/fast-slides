@@ -40,6 +40,10 @@ When the app is running, a local HTTP API is available at `http://127.0.0.1:3847
 - No automated test suite exists in this repo.
 - Validate functionality via the agent hook API endpoints and the local validation scripts in `skills/fastslides/scripts/`.
 
+### Per-project slide CSS
+
+Each project can include a `slides.css` file that overrides default slide styling. New projects created via `create_project` include a default `slides.css`. The CSS is loaded and injected at runtime when a project is selected. Edit via the Settings dialog or by modifying `slides.css` directly.
+
 ### Sample project
 
 A sample deck project is at `projects/tauri-is-awesome/` with `page.mdx` and `assets/`.
