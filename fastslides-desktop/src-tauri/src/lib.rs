@@ -1,3 +1,4 @@
+use base64::Engine;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -306,7 +307,6 @@ fn local_asset_path(raw: &str) -> Option<String> {
 
     let lower = value.to_ascii_lowercase();
     if value.starts_with('#')
-        || value.starts_with('/')
         || lower.starts_with("http://")
         || lower.starts_with("https://")
         || lower.starts_with("data:")
@@ -323,7 +323,23 @@ fn local_asset_path(raw: &str) -> Option<String> {
         return None;
     }
 
-    Some(no_query.replace('\\', "/"))
+    let normalized = no_query.replace('\\', "/");
+    if normalized.starts_with('/') {
+        let allowed = normalized == "/assets"
+            || normalized == "/images"
+            || normalized == "/media"
+            || normalized == "/data"
+            || normalized.starts_with("/assets/")
+            || normalized.starts_with("/images/")
+            || normalized.starts_with("/media/")
+            || normalized.starts_with("/data/");
+        if !allowed {
+            return None;
+        }
+        return Some(normalized.trim_start_matches('/').to_string());
+    }
+
+    Some(normalized)
 }
 
 fn resolve_relative_path(base_dir: &Path, relative: &str) -> Option<PathBuf> {
@@ -346,6 +362,25 @@ fn resolve_relative_path(base_dir: &Path, relative: &str) -> Option<PathBuf> {
     }
 
     Some(output)
+}
+
+fn mime_type_for_path(path: &Path) -> &'static str {
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .map(|value| value.to_ascii_lowercase())
+        .unwrap_or_default();
+
+    match extension.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        "avif" => "image/avif",
+        _ => "application/octet-stream",
+    }
 }
 
 fn read_page_mdx(project_dir: &Path) -> Result<String, String> {
@@ -965,6 +1000,48 @@ fn validate_project(path: String) -> Result<ValidationReport, String> {
 }
 
 #[tauri::command]
+fn resolve_project_asset_data_url(project_path: String, raw_src: String) -> Result<String, String> {
+    if raw_src.trim().is_empty() || raw_src.trim().starts_with('#') {
+        return Ok(raw_src);
+    }
+
+    let canonical_project = normalize_existing_project_directory(&project_path)?;
+    let Some(relative_path) = local_asset_path(raw_src.as_str()) else {
+        return Ok(raw_src);
+    };
+
+    if relative_path == ".." || relative_path.starts_with("../") {
+        return Err(format!("Invalid traversal asset path: {raw_src}"));
+    }
+
+    let Some(resolved_path) = resolve_relative_path(&canonical_project, &relative_path) else {
+        return Err(format!("Asset path escapes project folder: {raw_src}"));
+    };
+
+    if !resolved_path.exists() {
+        return Err(format!(
+            "Missing asset target: {} -> {}",
+            raw_src,
+            resolved_path.display()
+        ));
+    }
+
+    if !resolved_path.is_file() {
+        return Err(format!(
+            "Asset target is not a file: {} -> {}",
+            raw_src,
+            resolved_path.display()
+        ));
+    }
+
+    let asset_bytes = fs::read(&resolved_path)
+        .map_err(|error| format!("Failed to read {}: {error}", resolved_path.display()))?;
+    let mime_type = mime_type_for_path(&resolved_path);
+    let encoded = base64::engine::general_purpose::STANDARD.encode(asset_bytes);
+    Ok(format!("data:{mime_type};base64,{encoded}"))
+}
+
+#[tauri::command]
 fn open_in_file_manager(path: String) -> Result<(), String> {
     let target = normalize_existing_directory(&path)?;
 
@@ -1313,6 +1390,7 @@ pub fn run() {
             remove_project,
             remove_projects_root,
             save_project,
+            resolve_project_asset_data_url,
             validate_project
         ])
         .run(tauri::generate_context!())

@@ -7,6 +7,7 @@ import {
   useState,
   type ComponentType,
   type CSSProperties,
+  type ImgHTMLAttributes,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import Image from "next/image";
@@ -103,6 +104,8 @@ const EXPORT_SKILL_MENU_EVENT = "fastslides://export-skill";
 const PREVIEW_ZOOM_MIN = 0.8;
 const PREVIEW_ZOOM_MAX = 2.5;
 const PREVIEW_ZOOM_STEP = 0.05;
+const PROJECT_ROOT_ABSOLUTE_ASSET_PREFIXES = ["/assets/", "/images/", "/media/", "/data/"];
+const projectAssetDataUrlCache = new Map<string, string>();
 
 function clampPreviewZoom(zoom: number): number {
   return Math.min(PREVIEW_ZOOM_MAX, Math.max(PREVIEW_ZOOM_MIN, zoom));
@@ -124,8 +127,126 @@ function clampUnit(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
+function isExternalAssetPath(value: string): boolean {
+  const lower = value.toLowerCase();
+  return (
+    value.startsWith("//") ||
+    lower.startsWith("http://") ||
+    lower.startsWith("https://") ||
+    lower.startsWith("data:") ||
+    lower.startsWith("blob:") ||
+    lower.startsWith("mailto:") ||
+    lower.startsWith("tel:")
+  );
+}
+
+function splitAssetPathAndSuffix(raw: string): { pathOnly: string; suffix: string } {
+  const match = raw.match(/^([^?#]*)(.*)$/);
+  return {
+    pathOnly: match?.[1] ?? raw,
+    suffix: match?.[2] ?? "",
+  };
+}
+
+function normalizeProjectRelativeAsset(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.startsWith("#") || isExternalAssetPath(trimmed)) {
+    return null;
+  }
+
+  const { pathOnly } = splitAssetPathAndSuffix(trimmed);
+  if (!pathOnly) {
+    return null;
+  }
+
+  let relative = pathOnly.replace(/\\/g, "/");
+  if (relative.startsWith("/")) {
+    const supportedRootRelative = PROJECT_ROOT_ABSOLUTE_ASSET_PREFIXES.some(
+      (prefix) => relative === prefix.slice(0, -1) || relative.startsWith(prefix),
+    );
+    if (!supportedRootRelative) {
+      return null;
+    }
+    relative = relative.slice(1);
+  }
+
+  const normalizedParts: string[] = [];
+  for (const part of relative.split("/")) {
+    if (!part || part === ".") {
+      continue;
+    }
+    if (part === "..") {
+      if (normalizedParts.length === 0) {
+        return null;
+      }
+      normalizedParts.pop();
+      continue;
+    }
+    normalizedParts.push(part);
+  }
+
+  if (normalizedParts.length === 0) {
+    return null;
+  }
+
+  return normalizedParts.join("/");
+}
+
+function ProjectAssetImage({
+  projectPath,
+  ...props
+}: ImgHTMLAttributes<HTMLImageElement> & { projectPath: string }) {
+  const source = typeof props.src === "string" ? props.src : "";
+  const [resolvedSrc, setResolvedSrc] = useState(source);
+
+  useEffect(() => {
+    if (typeof props.src !== "string") {
+      return;
+    }
+
+    const normalizedRelative = normalizeProjectRelativeAsset(props.src);
+    if (!normalizedRelative || !projectPath || !isTauriRuntime()) {
+      setResolvedSrc(props.src);
+      return;
+    }
+
+    const cacheKey = `${projectPath}::${normalizedRelative}`;
+    const cached = projectAssetDataUrlCache.get(cacheKey);
+    if (cached) {
+      setResolvedSrc(cached);
+      return;
+    }
+
+    let cancelled = false;
+    setResolvedSrc(props.src);
+    call<string>("resolve_project_asset_data_url", {
+      projectPath,
+      rawSrc: props.src,
+    })
+      .then((nextSource) => {
+        if (cancelled) {
+          return;
+        }
+        projectAssetDataUrlCache.set(cacheKey, nextSource);
+        setResolvedSrc(nextSource);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setResolvedSrc(source);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectPath, props.src]);
+
+  return <img {...props} src={resolvedSrc || source} loading={props.loading ?? "lazy"} />;
+}
+
 function EmbeddedDeckPreview({
   source,
+  projectPath,
   presenterMode,
   activeSlideIndex,
   onSlideCountChange,
@@ -133,6 +254,7 @@ function EmbeddedDeckPreview({
   onSlideOutlineChange,
 }: {
   source: string;
+  projectPath: string;
   presenterMode: boolean;
   activeSlideIndex: number;
   onSlideCountChange: (count: number) => void;
@@ -144,6 +266,14 @@ function EmbeddedDeckPreview({
   const previewRootRef = useRef<HTMLDivElement | null>(null);
   const slideElementsRef = useRef<HTMLElement[]>([]);
   const previousActiveSlideRef = useRef(-1);
+  const mdxComponents = useMemo(
+    () => ({
+      img: (props: ImgHTMLAttributes<HTMLImageElement>) => {
+        return <ProjectAssetImage {...props} projectPath={projectPath} />;
+      },
+    }),
+    [projectPath],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -308,7 +438,7 @@ function EmbeddedDeckPreview({
 
   return (
     <div ref={previewRootRef} className="embedded-preview-deck">
-      <CompiledDeck />
+      <CompiledDeck components={mdxComponents} />
     </div>
   );
 }
@@ -1085,6 +1215,7 @@ export default function Home() {
               <div ref={previewSurfaceRef} className="embedded-preview-surface">
                 <EmbeddedDeckPreview
                   source={selectedProjectEmbeddedSource}
+                  projectPath={selectedProject.path}
                   presenterMode={presenterMode}
                   activeSlideIndex={activeSlideIndex}
                   onSlideCountChange={setEmbeddedSlideCount}

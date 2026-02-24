@@ -897,6 +897,11 @@ textarea {
   color: var(--sidebar-text-secondary);
 }
 
+.embedded-preview-deck img {
+  max-width: 100%;
+  height: auto;
+}
+
 .empty-center {
   width: 100%;
   height: 100%;
