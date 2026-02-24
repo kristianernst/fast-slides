@@ -29,7 +29,7 @@ EXTERNAL_PREFIXES = (
 
 
 def default_projects_dir() -> Path:
-    return detect_default_projects_dir(__file__)
+    return detect_default_projects_dir()
 
 
 def is_inside(parent: Path, target: Path) -> bool:
@@ -74,7 +74,7 @@ def local_asset_path(raw: str) -> str | None:
 
     if not value:
         return None
-    if value.startswith("#") or value.startswith("/"):
+    if value.startswith("#"):
         return None
     if lower.startswith(EXTERNAL_PREFIXES):
         return None
@@ -85,6 +85,21 @@ def local_asset_path(raw: str) -> str | None:
         return None
 
     decoded = unquote(no_query).replace("\\", "/")
+    if decoded.startswith("/"):
+        allowed = (
+            decoded == "/assets"
+            or decoded == "/images"
+            or decoded == "/media"
+            or decoded == "/data"
+            or decoded.startswith("/assets/")
+            or decoded.startswith("/images/")
+            or decoded.startswith("/media/")
+            or decoded.startswith("/data/")
+        )
+        if not allowed:
+            return None
+        decoded = decoded[1:]
+
     normalized = posixpath.normpath(decoded)
     return normalized
 
