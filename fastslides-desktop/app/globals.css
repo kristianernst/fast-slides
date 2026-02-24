@@ -471,9 +471,11 @@ textarea {
 
 .project-section {
   min-height: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  overflow: hidden;
 }
 
 .section-title-row {
@@ -1293,28 +1295,31 @@ textarea {
 }
 
 .sidebar-foot {
-  margin-top: auto;
+  flex-shrink: 0;
   padding-top: var(--space-3);
   display: flex;
   align-items: center;
 }
 
 .settings-trigger {
-  border: 0;
-  background: transparent;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
   color: var(--color-text-secondary);
-  padding: var(--space-1-5);
-  border-radius: var(--radius-sm);
+  padding: var(--space-1-5) var(--space-3);
+  border-radius: var(--radius-md);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  line-height: 0;
-  transition: color var(--transition-base);
+  gap: var(--space-1-5);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-medium);
+  transition: color var(--transition-base), background var(--transition-base);
 }
 
 .settings-trigger:hover {
   color: var(--color-text-primary);
+  background: var(--color-bg-hover);
 }
 
 @media (max-width: 1080px) {

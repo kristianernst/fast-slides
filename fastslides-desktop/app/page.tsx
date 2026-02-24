@@ -1268,7 +1268,8 @@ export default function Home() {
             onClick={() => setSettingsOpen(true)}
             aria-label="Settings"
           >
-            <Settings size={16} weight="Linear" />
+            <Settings size={14} weight="Linear" />
+            <span>Settings</span>
           </button>
         </footer>
       </aside>
