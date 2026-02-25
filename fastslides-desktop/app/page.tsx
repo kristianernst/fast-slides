@@ -1,29 +1,37 @@
 "use client";
 
 import {
+  Children,
+  isValidElement,
   useEffect,
   useMemo,
   useRef,
   useState,
   type ComponentType,
   type CSSProperties,
+  type HTMLAttributes,
   type ImgHTMLAttributes,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
-import Image from "next/image";
 import { invoke } from "@tauri-apps/api/core";
 import * as jsxRuntime from "react/jsx-runtime";
+import { THEMES, renderMermaid } from "beautiful-mermaid";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import {
-  BoxMinimalistic,
-  CloseCircle,
-  Maximize,
-  Minimize,
-  Moon,
-  Pin,
-  Settings,
-  SidebarMinimalistic,
-  Sun,
-} from "@solar-icons/react";
+  materialLight,
+  nightOwl,
+  oneDark,
+  oneLight,
+  vs,
+  vscDarkPlus,
+} from "react-syntax-highlighter/dist/esm/styles/prism";
+import { AppSidebar } from "./components/sidebar/AppSidebar";
+import { SidebarResizer } from "./components/sidebar/SidebarResizer";
+import { SidebarToggleButton } from "./components/sidebar/SidebarToggleButton";
+import { AssetLightbox } from "./components/overlays/AssetLightbox";
+import { SettingsOverlay } from "./components/settings/SettingsOverlay";
+import { PreviewWorkspace } from "./components/workspace/PreviewWorkspace";
 
 type AppConfig = {
   projects_roots: string[];
@@ -52,17 +60,281 @@ type AppState = {
   projects: ProjectSummary[];
 };
 
+type AppConfig = {
+  projects_roots: string[];
+  recent_projects: string[];
+  pinned_projects: string[];
+};
+
 type SlideOutlineEntry = {
   index: number;
   title: string;
 };
 
-type SlideTocTick = {
-  key: string;
-  ratio: number;
-  slideIndex: number;
-  title: string;
+type ExpandableAsset = {
+  kind: "image" | "video";
+  src: string;
+  alt: string;
 };
+
+type LayoutGapScale = "xs" | "sm" | "md" | "lg" | "xl";
+type LayoutAlign = "start" | "center" | "end" | "stretch";
+type LayoutJustify = "start" | "center" | "end" | "between";
+type CardTone = "default" | "accent" | "success" | "warning" | "danger";
+
+const LAYOUT_GAP_MULTIPLIER: Record<LayoutGapScale, number> = {
+  xs: 0.5,
+  sm: 0.75,
+  md: 1,
+  lg: 1.5,
+  xl: 2,
+};
+
+function normalizeLayoutGap(value: unknown): LayoutGapScale {
+  if (typeof value !== "string") {
+    return "md";
+  }
+  const normalized = value.trim().toLowerCase();
+  if ((Object.keys(LAYOUT_GAP_MULTIPLIER) as LayoutGapScale[]).includes(normalized as LayoutGapScale)) {
+    return normalized as LayoutGapScale;
+  }
+  return "md";
+}
+
+function normalizeLayoutAlign(value: unknown): LayoutAlign {
+  if (typeof value !== "string") {
+    return "stretch";
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "start" || normalized === "center" || normalized === "end" || normalized === "stretch") {
+    return normalized;
+  }
+  return "stretch";
+}
+
+function normalizeLayoutJustify(value: unknown): LayoutJustify {
+  if (typeof value !== "string") {
+    return "start";
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "start" || normalized === "center" || normalized === "end" || normalized === "between") {
+    return normalized;
+  }
+  return "start";
+}
+
+function normalizeGridColumns(value: unknown): 1 | 2 | 3 {
+  if (typeof value === "number") {
+    if (value === 1 || value === 2 || value === 3) {
+      return value;
+    }
+    return 2;
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    if (parsed === 1 || parsed === 2 || parsed === 3) {
+      return parsed;
+    }
+  }
+  return 2;
+}
+
+function normalizeCardTone(value: unknown): CardTone {
+  if (typeof value !== "string") {
+    return "default";
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "default" || normalized === "accent" || normalized === "success" || normalized === "warning" || normalized === "danger") {
+    return normalized;
+  }
+  return "default";
+}
+
+function layoutGapCssValue(gap: unknown): string {
+  const normalized = normalizeLayoutGap(gap);
+  return `calc(var(--slide-layout-gap, 16px) * ${LAYOUT_GAP_MULTIPLIER[normalized]})`;
+}
+
+function layoutAlignCssValue(align: unknown): CSSProperties["alignItems"] {
+  const normalized = normalizeLayoutAlign(align);
+  if (normalized === "start") return "flex-start";
+  if (normalized === "end") return "flex-end";
+  if (normalized === "center") return "center";
+  return "stretch";
+}
+
+function layoutJustifyCssValue(justify: unknown): CSSProperties["justifyContent"] {
+  const normalized = normalizeLayoutJustify(justify);
+  if (normalized === "start") return "flex-start";
+  if (normalized === "end") return "flex-end";
+  if (normalized === "center") return "center";
+  return "space-between";
+}
+
+type MdxLayoutProps = HTMLAttributes<HTMLDivElement> & {
+  gap?: LayoutGapScale | string;
+  align?: LayoutAlign | string;
+  justify?: LayoutJustify | string;
+};
+
+function MdxStack({
+  children,
+  className,
+  style,
+  gap = "md",
+  align = "stretch",
+  justify = "start",
+  ...props
+}: MdxLayoutProps) {
+  return (
+    <div
+      {...props}
+      className={["mdx-stack", className].filter(Boolean).join(" ")}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0,
+        gap: layoutGapCssValue(gap),
+        alignItems: layoutAlignCssValue(align),
+        justifyContent: layoutJustifyCssValue(justify),
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+type MdxRowProps = MdxLayoutProps & {
+  nowrap?: boolean;
+};
+
+function MdxRow({
+  children,
+  className,
+  style,
+  gap = "md",
+  align = "stretch",
+  justify = "start",
+  nowrap = false,
+  ...props
+}: MdxRowProps) {
+  return (
+    <div
+      {...props}
+      className={["mdx-row", className].filter(Boolean).join(" ")}
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        minWidth: 0,
+        gap: layoutGapCssValue(gap),
+        alignItems: layoutAlignCssValue(align),
+        justifyContent: layoutJustifyCssValue(justify),
+        flexWrap: nowrap ? "nowrap" : "wrap",
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+type MdxGridProps = HTMLAttributes<HTMLDivElement> & {
+  cols?: 1 | 2 | 3 | string | number;
+  gap?: LayoutGapScale | string;
+  align?: LayoutAlign | string;
+};
+
+function MdxGrid({
+  children,
+  className,
+  style,
+  cols = 2,
+  gap = "md",
+  align = "stretch",
+  ...props
+}: MdxGridProps) {
+  const normalizedCols = normalizeGridColumns(cols);
+  return (
+    <div
+      {...props}
+      className={["mdx-grid", className].filter(Boolean).join(" ")}
+      data-cols={normalizedCols}
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${normalizedCols}, minmax(0, 1fr))`,
+        minWidth: 0,
+        gap: layoutGapCssValue(gap),
+        alignItems: layoutAlignCssValue(align),
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+type MdxCardProps = HTMLAttributes<HTMLDivElement> & {
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  tone?: CardTone | string;
+};
+
+function MdxCard({
+  children,
+  className,
+  title,
+  subtitle,
+  tone = "default",
+  ...props
+}: MdxCardProps) {
+  const normalizedTone = normalizeCardTone(tone);
+  return (
+    <article
+      {...props}
+      className={["mdx-card", `mdx-card--${normalizedTone}`, className].filter(Boolean).join(" ")}
+    >
+      {title ? <h3 className="mdx-card-title">{title}</h3> : null}
+      {subtitle ? <p className="mdx-caption mdx-card-subtitle">{subtitle}</p> : null}
+      <div className="mdx-card-body">{children}</div>
+    </article>
+  );
+}
+
+type MdxMetricProps = HTMLAttributes<HTMLDivElement> & {
+  label?: ReactNode;
+  value?: ReactNode;
+  hint?: ReactNode;
+};
+
+function MdxMetric({
+  className,
+  label,
+  value,
+  hint,
+  children,
+  ...props
+}: MdxMetricProps) {
+  return (
+    <article {...props} className={["mdx-metric", className].filter(Boolean).join(" ")}>
+      {label ? <p className="mdx-caption mdx-metric-label">{label}</p> : null}
+      <p className="mdx-metric-value">{value ?? children}</p>
+      {hint ? <p className="mdx-caption mdx-metric-hint">{hint}</p> : null}
+    </article>
+  );
+}
+
+function MdxCaption({
+  children,
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div {...props} className={["mdx-caption", className].filter(Boolean).join(" ")}>
+      {children}
+    </div>
+  );
+}
 
 function isTauriRuntime(): boolean {
   if (typeof window === "undefined") {
@@ -100,22 +372,95 @@ async function pickFolder(title: string): Promise<string> {
 
 const SELECTED_STATE_KEY = "fastslides_selected_path";
 const SIDEBAR_WIDTH_STATE_KEY = "fastslides_sidebar_width";
-const PINNED_STATE_KEY = "fastslides_pinned_paths";
 const THEME_STATE_KEY = "fastslides_theme";
+const MERMAID_THEME_STATE_KEY = "fastslides_mermaid_theme";
+const SYNTAX_THEME_STATE_KEY = "fastslides_syntax_theme";
+
+const MERMAID_THEME_OPTIONS = [
+  "zinc-light",
+  "zinc-dark",
+  "tokyo-night",
+  "tokyo-night-storm",
+  "tokyo-night-light",
+  "catppuccin-latte",
+  "catppuccin-mocha",
+  "nord",
+  "nord-light",
+  "dracula",
+  "github-light",
+  "github-dark",
+  "one-dark",
+  "solarized-light",
+  "solarized-dark",
+] as const;
+type MermaidThemeName = (typeof MERMAID_THEME_OPTIONS)[number];
+
+const MERMAID_THEME_LABELS: Record<MermaidThemeName, string> = {
+  "zinc-light": "Zinc Light",
+  "zinc-dark": "Zinc Dark",
+  "tokyo-night": "Tokyo Night",
+  "tokyo-night-storm": "Tokyo Night Storm",
+  "tokyo-night-light": "Tokyo Night Light",
+  "catppuccin-latte": "Catppuccin Latte",
+  "catppuccin-mocha": "Catppuccin Mocha",
+  nord: "Nord",
+  "nord-light": "Nord Light",
+  dracula: "Dracula",
+  "github-light": "GitHub Light",
+  "github-dark": "GitHub Dark",
+  "one-dark": "One Dark",
+  "solarized-light": "Solarized Light",
+  "solarized-dark": "Solarized Dark",
+};
+
+const SYNTAX_THEME_OPTIONS_BY_MODE = {
+  dark: ["one-dark", "vsc-dark-plus", "night-owl"],
+  light: ["one-light", "vs", "material-light"],
+} as const;
+type SyntaxThemeMode = keyof typeof SYNTAX_THEME_OPTIONS_BY_MODE;
+type SyntaxThemeName =
+  | (typeof SYNTAX_THEME_OPTIONS_BY_MODE)["dark"][number]
+  | (typeof SYNTAX_THEME_OPTIONS_BY_MODE)["light"][number];
+
+const SYNTAX_THEME_LABELS: Record<SyntaxThemeName, string> = {
+  "one-dark": "One Dark",
+  "one-light": "One Light",
+  "vsc-dark-plus": "VS Code Dark+",
+  vs: "VS",
+  "night-owl": "Night Owl",
+  "material-light": "Material Light",
+};
+
+const SYNTAX_THEME_STYLES: Record<SyntaxThemeName, Record<string, CSSProperties>> = {
+  "one-dark": oneDark,
+  "one-light": oneLight,
+  "vsc-dark-plus": vscDarkPlus,
+  vs,
+  "night-owl": nightOwl,
+  "material-light": materialLight,
+};
 
 type SlideTokens = {
   slideBg: string;
   slideBorder: string;
   slideRadius: string;
   slidePadding: string;
+  slideLayoutGap: string;
+  slideCardBg: string;
+  slideCardBorder: string;
+  slideCardRadius: string;
+  slideCardPadding: string;
   slideFontFamily: string;
   slideHeadingFont: string;
   slideCodeFont: string;
+  slideMetaFont: string;
+  slideMetaSize: string;
   slideFg: string;
   slideH1Color: string;
   slideH2Color: string;
   slideH3Color: string;
   slideBodyColor: string;
+  slideMetaColor: string;
   slideAccent: string;
   slideLinkColor: string;
   slideCodeBg: string;
@@ -128,20 +473,28 @@ type SlideTokens = {
 
 const DEFAULT_TOKENS: SlideTokens = {
   slideBg: "#0e0d0a",
-  slideBorder: "rgba(239, 239, 235, 0.12)",
+  slideBorder: "#efefeb1f",
   slideRadius: "10px",
   slidePadding: "32px",
+  slideLayoutGap: "16px",
+  slideCardBg: "#ffffff08",
+  slideCardBorder: "#00000000",
+  slideCardRadius: "10px",
+  slideCardPadding: "16px",
   slideFontFamily: '"Inter", system-ui, sans-serif',
   slideHeadingFont: "var(--slide-font-family)",
   slideCodeFont: '"Fira Code", monospace',
+  slideMetaFont: "var(--slide-code-font)",
+  slideMetaSize: "0.78rem",
   slideFg: "#edecec",
   slideH1Color: "#ffffff",
   slideH2Color: "#d7d6d5",
   slideH3Color: "#b0afab",
   slideBodyColor: "#c4c3bf",
+  slideMetaColor: "#c4c3bfe0",
   slideAccent: "#7b9cbc",
   slideLinkColor: "var(--slide-accent)",
-  slideCodeBg: "rgba(255, 255, 255, 0.06)",
+  slideCodeBg: "#ffffff0f",
   slidePalette1: "#7b9cbc",
   slidePalette2: "#63b18a",
   slidePalette3: "#e1b86f",
@@ -154,14 +507,22 @@ const TOKEN_TO_VAR: Record<keyof SlideTokens, string> = {
   slideBorder: "--slide-border",
   slideRadius: "--slide-radius",
   slidePadding: "--slide-padding",
+  slideLayoutGap: "--slide-layout-gap",
+  slideCardBg: "--slide-card-bg",
+  slideCardBorder: "--slide-card-border",
+  slideCardRadius: "--slide-card-radius",
+  slideCardPadding: "--slide-card-padding",
   slideFontFamily: "--slide-font-family",
   slideHeadingFont: "--slide-heading-font",
   slideCodeFont: "--slide-code-font",
+  slideMetaFont: "--slide-meta-font",
+  slideMetaSize: "--slide-meta-size",
   slideFg: "--slide-fg",
   slideH1Color: "--slide-h1-color",
   slideH2Color: "--slide-h2-color",
   slideH3Color: "--slide-h3-color",
   slideBodyColor: "--slide-body-color",
+  slideMetaColor: "--slide-meta-color",
   slideAccent: "--slide-accent",
   slideLinkColor: "--slide-link-color",
   slideCodeBg: "--slide-code-bg",
@@ -179,6 +540,23 @@ const FONT_OPTIONS = [
   '"Fira Code", monospace',
   'system-ui, sans-serif',
 ];
+
+const MONO_FONT_OPTIONS = [
+  '"Fira Code", monospace',
+  '"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+  "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+];
+
+function fontLabel(fontValue: string): string {
+  if (fontValue === "var(--slide-font-family)") {
+    return "Same as body";
+  }
+  if (fontValue === "var(--slide-code-font)") {
+    return "Same as code";
+  }
+  const first = fontValue.split(",")[0] || fontValue;
+  return first.replace(/["']/g, "").trim();
+}
 
 function parseCssToTokens(css: string): Partial<SlideTokens> {
   const result: Partial<SlideTokens> = {};
@@ -208,7 +586,12 @@ function isHexColor(v: string): boolean {
 
 function hexForInput(v: string): string {
   const t = v.trim();
+  if (/^#[0-9a-fA-F]{8}$/.test(t)) return t.slice(0, 7);
   if (/^#[0-9a-fA-F]{6}$/.test(t)) return t;
+  if (/^#[0-9a-fA-F]{4}$/.test(t)) {
+    const [, a, b, c] = t;
+    return `#${a}${a}${b}${b}${c}${c}`;
+  }
   if (/^#[0-9a-fA-F]{3}$/.test(t)) {
     const [, a, b, c] = t;
     return `#${a}${a}${b}${b}${c}${c}`;
@@ -217,12 +600,15 @@ function hexForInput(v: string): string {
 }
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 420;
+const OPEN_SETTINGS_MENU_EVENT = "fastslides://open-settings";
 const EXPORT_SKILL_MENU_EVENT = "fastslides://export-skill";
 const PREVIEW_ZOOM_MIN = 0.8;
 const PREVIEW_ZOOM_MAX = 2.5;
 const PREVIEW_ZOOM_STEP = 0.05;
 const PROJECT_ROOT_ABSOLUTE_ASSET_PREFIXES = ["/assets/", "/images/", "/media/", "/data/"];
 const projectAssetDataUrlCache = new Map<string, string>();
+const IMAGE_ASSET_EXTENSION_RE = /\.(avif|bmp|gif|jpe?g|png|svg|webp)$/i;
+const VIDEO_ASSET_EXTENSION_RE = /\.(m4v|mov|mp4|ogv|ogg|webm)$/i;
 
 function clampPreviewZoom(zoom: number): number {
   return Math.min(PREVIEW_ZOOM_MAX, Math.max(PREVIEW_ZOOM_MIN, zoom));
@@ -309,6 +695,206 @@ function normalizeProjectRelativeAsset(raw: string): string | null {
   return normalizedParts.join("/");
 }
 
+function inferAssetKind(rawValue: string): ExpandableAsset["kind"] | null {
+  const value = rawValue.trim();
+  if (!value) {
+    return null;
+  }
+  const { pathOnly } = splitAssetPathAndSuffix(value);
+  if (IMAGE_ASSET_EXTENSION_RE.test(pathOnly)) {
+    return "image";
+  }
+  if (VIDEO_ASSET_EXTENSION_RE.test(pathOnly)) {
+    return "video";
+  }
+  return null;
+}
+
+function isMermaidThemeName(value: string): value is MermaidThemeName {
+  return (MERMAID_THEME_OPTIONS as readonly string[]).includes(value);
+}
+
+function isSyntaxThemeName(value: string): value is SyntaxThemeName {
+  return (
+    (SYNTAX_THEME_OPTIONS_BY_MODE.dark as readonly string[]).includes(value) ||
+    (SYNTAX_THEME_OPTIONS_BY_MODE.light as readonly string[]).includes(value)
+  );
+}
+
+function syntaxThemeModeForUiTheme(uiTheme: "dark" | "light"): SyntaxThemeMode {
+  return uiTheme === "light" ? "light" : "dark";
+}
+
+function flattenText(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => flattenText(item)).join("");
+  }
+  if (isValidElement(value)) {
+    return flattenText((value.props as { children?: unknown }).children);
+  }
+  return "";
+}
+
+function extractFencedCode(children: ReactNode): { language: string; code: string } | null {
+  const nodes = Children.toArray(children);
+  const codeNode = nodes.find((node) => isValidElement(node) && node.type === "code");
+  if (!codeNode || !isValidElement(codeNode)) {
+    return null;
+  }
+
+  const props = codeNode.props as {
+    className?: string;
+    children?: ReactNode;
+  };
+  const className = props.className || "";
+  const languageMatch = className.match(/language-([\w-]+)/i);
+  const language = languageMatch?.[1]?.toLowerCase() ?? "";
+  const code = flattenText(props.children).replace(/\n$/, "");
+
+  return { language, code };
+}
+
+function MermaidDiagram({
+  code,
+  mermaidThemeName,
+}: {
+  code: string;
+  mermaidThemeName: MermaidThemeName;
+}) {
+  const [svg, setSvg] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setSvg("");
+    setError("");
+
+    const theme = THEMES[mermaidThemeName as keyof typeof THEMES] ?? THEMES["zinc-dark"];
+    renderMermaid(code, {
+      ...theme,
+      transparent: true,
+      font: "Inter",
+    })
+      .then((nextSvg) => {
+        if (!cancelled) {
+          setSvg(nextSvg);
+        }
+      })
+      .catch((cause) => {
+        if (!cancelled) {
+          const message = cause instanceof Error ? cause.message : "Failed to render Mermaid diagram.";
+          setError(message);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [code, mermaidThemeName]);
+
+  if (error) {
+    return (
+      <pre className="mermaid-render-error">
+        <code>{code}</code>
+      </pre>
+    );
+  }
+
+  if (!svg) {
+    return <div className="mermaid-preview-loading">Rendering Mermaid…</div>;
+  }
+
+  return (
+    <div className="mermaid-preview-block">
+      <div
+        className="mermaid-preview-svg"
+        dangerouslySetInnerHTML={{ __html: svg }}
+      />
+    </div>
+  );
+}
+
+function MdxPreBlock({
+  children,
+  mermaidThemeName,
+  syntaxThemeName,
+  uiTheme,
+}: HTMLAttributes<HTMLPreElement> & {
+  children?: ReactNode;
+  mermaidThemeName: MermaidThemeName;
+  syntaxThemeName: SyntaxThemeName;
+  uiTheme: "dark" | "light";
+}) {
+  const parsed = extractFencedCode(children);
+  if (!parsed) {
+    return <pre>{children}</pre>;
+  }
+
+  if (parsed.language === "mermaid") {
+    return <MermaidDiagram code={parsed.code} mermaidThemeName={mermaidThemeName} />;
+  }
+
+  const syntaxTheme =
+    SYNTAX_THEME_STYLES[syntaxThemeName] || (uiTheme === "light" ? oneLight : oneDark);
+
+  return (
+    <SyntaxHighlighter
+      className="slide-syntax-block"
+      language={parsed.language || "text"}
+      style={syntaxTheme}
+      customStyle={{
+        margin: 0,
+        borderRadius: 10,
+        padding: "14px 16px",
+        background: "var(--slide-code-bg, rgba(255, 255, 255, 0.06))",
+        border: "1px solid var(--slide-card-border, transparent)",
+      }}
+      codeTagProps={{
+        style: {
+          fontFamily: "var(--slide-code-font, var(--font-mono))",
+          fontSize: "0.88rem",
+          lineHeight: "1.5",
+        },
+      }}
+      wrapLongLines
+      showLineNumbers={parsed.code.split("\n").length > 6}
+      lineNumberStyle={{
+        color: "var(--color-text-tertiary)",
+        opacity: 0.85,
+        paddingRight: "0.85rem",
+      }}
+    >
+      {parsed.code}
+    </SyntaxHighlighter>
+  );
+}
+
+async function resolveProjectAssetSource(projectPath: string, rawSrc: string): Promise<string> {
+  const normalizedRelative = normalizeProjectRelativeAsset(rawSrc);
+  if (!normalizedRelative || !projectPath || !isTauriRuntime()) {
+    return rawSrc;
+  }
+
+  const cacheKey = `${projectPath}::${normalizedRelative}`;
+  const cached = projectAssetDataUrlCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const nextSource = await call<string>("resolve_project_asset_data_url", {
+    projectPath,
+    rawSrc,
+  });
+  projectAssetDataUrlCache.set(cacheKey, nextSource);
+  return nextSource;
+}
+
 function ProjectAssetImage({
   projectPath,
   ...props
@@ -321,30 +907,13 @@ function ProjectAssetImage({
       return;
     }
 
-    const normalizedRelative = normalizeProjectRelativeAsset(props.src);
-    if (!normalizedRelative || !projectPath || !isTauriRuntime()) {
-      setResolvedSrc(props.src);
-      return;
-    }
-
-    const cacheKey = `${projectPath}::${normalizedRelative}`;
-    const cached = projectAssetDataUrlCache.get(cacheKey);
-    if (cached) {
-      setResolvedSrc(cached);
-      return;
-    }
-
     let cancelled = false;
     setResolvedSrc(props.src);
-    call<string>("resolve_project_asset_data_url", {
-      projectPath,
-      rawSrc: props.src,
-    })
+    resolveProjectAssetSource(projectPath, props.src)
       .then((nextSource) => {
         if (cancelled) {
           return;
         }
-        projectAssetDataUrlCache.set(cacheKey, nextSource);
         setResolvedSrc(nextSource);
       })
       .catch(() => {
@@ -364,19 +933,27 @@ function ProjectAssetImage({
 function EmbeddedDeckPreview({
   source,
   projectPath,
+  mermaidThemeName,
+  syntaxThemeName,
+  uiTheme,
   presenterMode,
   activeSlideIndex,
   onSlideCountChange,
   onActiveSlidePick,
   onSlideOutlineChange,
+  onAssetOpen,
 }: {
   source: string;
   projectPath: string;
+  mermaidThemeName: MermaidThemeName;
+  syntaxThemeName: SyntaxThemeName;
+  uiTheme: "dark" | "light";
   presenterMode: boolean;
   activeSlideIndex: number;
   onSlideCountChange: (count: number) => void;
   onActiveSlidePick: (index: number) => void;
   onSlideOutlineChange: (slides: SlideOutlineEntry[]) => void;
+  onAssetOpen: (asset: ExpandableAsset) => void;
 }) {
   const [CompiledDeck, setCompiledDeck] = useState<ComponentType<Record<string, unknown>> | null>(null);
   const [error, setError] = useState("");
@@ -388,8 +965,22 @@ function EmbeddedDeckPreview({
       img: (props: ImgHTMLAttributes<HTMLImageElement>) => {
         return <ProjectAssetImage {...props} projectPath={projectPath} />;
       },
+      pre: (props: HTMLAttributes<HTMLPreElement>) => (
+        <MdxPreBlock
+          {...props}
+          mermaidThemeName={mermaidThemeName}
+          syntaxThemeName={syntaxThemeName}
+          uiTheme={uiTheme}
+        />
+      ),
+      Stack: MdxStack,
+      Row: MdxRow,
+      Grid: MdxGrid,
+      Card: MdxCard,
+      Metric: MdxMetric,
+      Caption: MdxCaption,
     }),
-    [projectPath],
+    [mermaidThemeName, projectPath, syntaxThemeName, uiTheme],
   );
 
   useEffect(() => {
@@ -447,6 +1038,9 @@ function EmbeddedDeckPreview({
     previousActiveSlideRef.current = -1;
     onSlideCountChange(slides.length);
     root.classList.remove("embedded-preview-single");
+    // #region agent log
+    fetch('http://127.0.0.1:7637/ingest/fbbbe842-bb8a-48b9-afb2-b7aedf00ea7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1da6c6'},body:JSON.stringify({sessionId:'1da6c6',runId:'run1',hypothesisId:'2',location:'app/page.tsx:EmbeddedDeckPreview_useEffect',message:'Removed embedded-preview-single on load',data:{presenterMode},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
 
     const nextOutline: SlideOutlineEntry[] = [];
     for (let index = 0; index < slides.length; index += 1) {
@@ -524,10 +1118,64 @@ function EmbeddedDeckPreview({
     }
 
     const onClick = (event: MouseEvent): void => {
+      const target = event.target as HTMLElement | null;
+
+      const image = target?.closest("img") as HTMLImageElement | null;
+      if (image) {
+        const rawSource = image.currentSrc || image.src || image.getAttribute("src") || "";
+        if (rawSource) {
+          event.preventDefault();
+          event.stopPropagation();
+          onAssetOpen({
+            kind: "image",
+            src: rawSource,
+            alt: image.alt || image.getAttribute("title") || "Slide image",
+          });
+          return;
+        }
+      }
+
+      const video = target?.closest("video") as HTMLVideoElement | null;
+      if (video) {
+        const sourceNode = video.querySelector<HTMLSourceElement>("source[src]");
+        const rawSource =
+          video.currentSrc ||
+          video.src ||
+          video.getAttribute("src") ||
+          sourceNode?.src ||
+          sourceNode?.getAttribute("src") ||
+          "";
+        if (rawSource) {
+          event.preventDefault();
+          event.stopPropagation();
+          onAssetOpen({
+            kind: "video",
+            src: rawSource,
+            alt: video.getAttribute("aria-label") || video.getAttribute("title") || "Slide video",
+          });
+          return;
+        }
+      }
+
+      const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
+      if (anchor) {
+        const rawHref = anchor.getAttribute("href") || anchor.href || "";
+        const kind = inferAssetKind(rawHref);
+        if (kind) {
+          event.preventDefault();
+          event.stopPropagation();
+          onAssetOpen({
+            kind,
+            src: rawHref,
+            alt: anchor.textContent?.trim() || "Slide asset",
+          });
+          return;
+        }
+      }
+
       if (presenterMode) {
         return;
       }
-      const target = event.target as HTMLElement | null;
       const slide = target?.closest(".slide") as HTMLElement | null;
       if (!slide) {
         return;
@@ -543,7 +1191,7 @@ function EmbeddedDeckPreview({
     return () => {
       root.removeEventListener("click", onClick);
     };
-  }, [onActiveSlidePick, presenterMode]);
+  }, [onActiveSlidePick, onAssetOpen, presenterMode]);
 
   if (error) {
     return <div className="embedded-preview-error">{error}</div>;
@@ -566,13 +1214,11 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [sidebarDragging, setSidebarDragging] = useState(false);
-  const [pinnedPaths, setPinnedPaths] = useState<string[]>([]);
   const [selectedProjectDetail, setSelectedProjectDetail] = useState<ProjectDetail | null>(null);
   const [presenterMode, setPresenterMode] = useState(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [embeddedSlideCount, setEmbeddedSlideCount] = useState(0);
   const [slideOutline, setSlideOutline] = useState<SlideOutlineEntry[]>([]);
-  const [tocPositionRatio, setTocPositionRatio] = useState(0);
   const [previewDockVisible, setPreviewDockVisible] = useState(true);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -583,7 +1229,33 @@ export default function Home() {
     }
     return "dark";
   });
+  const [mermaidThemeName, setMermaidThemeName] = useState<MermaidThemeName>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(MERMAID_THEME_STATE_KEY);
+      if (stored && isMermaidThemeName(stored)) {
+        return stored;
+      }
+      const storedUiTheme = localStorage.getItem(THEME_STATE_KEY);
+      if (storedUiTheme === "light") {
+        return "github-light";
+      }
+    }
+    return "zinc-dark";
+  });
+  const [syntaxThemeName, setSyntaxThemeName] = useState<SyntaxThemeName>(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem(SYNTAX_THEME_STATE_KEY);
+      if (stored && isSyntaxThemeName(stored)) {
+        return stored;
+      }
+      const storedUiTheme = localStorage.getItem(THEME_STATE_KEY) === "light" ? "light" : "dark";
+      const mode = syntaxThemeModeForUiTheme(storedUiTheme);
+      return SYNTAX_THEME_OPTIONS_BY_MODE[mode][0];
+    }
+    return SYNTAX_THEME_OPTIONS_BY_MODE.dark[0];
+  });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [expandedAsset, setExpandedAsset] = useState<ExpandableAsset | null>(null);
   const [projectCss, setProjectCss] = useState("");
   const [cssEditorValue, setCssEditorValue] = useState("");
   const [slideTokens, setSlideTokens] = useState<SlideTokens>({ ...DEFAULT_TOKENS });
@@ -619,37 +1291,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    try {
-      const raw = localStorage.getItem(PINNED_STATE_KEY);
-      if (!raw) {
-        return;
-      }
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        const nextPinned = Array.from(
-          new Set(parsed.filter((item): item is string => typeof item === "string")),
-        );
-        setPinnedPaths(nextPinned);
-      }
-    } catch {
-      // Ignore malformed local state and continue with empty pin set.
-    }
-  }, []);
-
-  useEffect(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem(SIDEBAR_WIDTH_STATE_KEY, String(sidebarWidth));
     }
   }, [sidebarWidth]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(PINNED_STATE_KEY, JSON.stringify(pinnedPaths));
-    }
-  }, [pinnedPaths]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -658,28 +1303,19 @@ export default function Home() {
     }
   }, [theme]);
 
-  const projects = appState?.projects || [];
   useEffect(() => {
-    const validPaths = new Set(projects.map((project) => project.path));
-    setPinnedPaths((previous) => {
-      const next = previous.filter((path) => validPaths.has(path));
-      return next.length === previous.length ? previous : next;
-    });
-  }, [projects]);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(MERMAID_THEME_STATE_KEY, mermaidThemeName);
+    }
+  }, [mermaidThemeName]);
 
-  const orderedProjects = useMemo(() => {
-    const pinnedSet = new Set(pinnedPaths);
-    const pinOrder = new Map(pinnedPaths.map((path, index) => [path, index]));
-    const pinnedProjects = projects
-      .filter((project) => pinnedSet.has(project.path))
-      .sort((left, right) => {
-        const leftOrder = pinOrder.get(left.path) ?? Number.MAX_SAFE_INTEGER;
-        const rightOrder = pinOrder.get(right.path) ?? Number.MAX_SAFE_INTEGER;
-        return leftOrder - rightOrder;
-      });
-    const unpinnedProjects = projects.filter((project) => !pinnedSet.has(project.path));
-    return [...pinnedProjects, ...unpinnedProjects];
-  }, [pinnedPaths, projects]);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(SYNTAX_THEME_STATE_KEY, syntaxThemeName);
+    }
+  }, [syntaxThemeName]);
+
+  const projects = appState?.projects || [];
 
   const selectedProject = useMemo(() => {
     if (!selectedPath) {
@@ -709,21 +1345,14 @@ export default function Home() {
     }));
   }, [slideOutline, visibleSlideCount]);
 
-  const slideTocTicks = useMemo<SlideTocTick[]>(() => {
-    const denominator = Math.max(slideTocEntries.length - 1, 1);
-    return slideTocEntries.map((entry, order) => ({
-      key: `major-${entry.index}`,
-      ratio: order / denominator,
-      slideIndex: entry.index,
-      title: entry.title,
-    }));
-  }, [slideTocEntries]);
-
   useEffect(() => {
+    // #region agent log
+    fetch('http://127.0.0.1:7637/ingest/fbbbe842-bb8a-48b9-afb2-b7aedf00ea7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1da6c6'},body:JSON.stringify({sessionId:'1da6c6',runId:'run1',hypothesisId:'1',location:'app/page.tsx:useEffect_project_change',message:'Project changed',data:{presenterMode},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     setActiveSlideIndex(0);
     setEmbeddedSlideCount(0);
     setSlideOutline([]);
-    setTocPositionRatio(0);
+    setPresenterMode(false);
   }, [selectedProject?.path]);
 
   useEffect(() => {
@@ -843,7 +1472,7 @@ export default function Home() {
     return nextIndex;
   }
 
-  function scrollListToSlide(index: number): void {
+  function scrollListToSlide(index: number, behavior: ScrollBehavior = "smooth"): void {
     const container = previewSurfaceRef.current;
     if (!container) {
       return;
@@ -853,7 +1482,7 @@ export default function Home() {
       return;
     }
     target.scrollIntoView({
-      behavior: "smooth",
+      behavior,
       block: "center",
       inline: "nearest",
     });
@@ -880,9 +1509,6 @@ export default function Home() {
     let rafId = 0;
     const updateActiveSlide = (): void => {
       rafId = 0;
-      const maxScroll = Math.max(container.scrollHeight - container.clientHeight, 0);
-      const ratio = maxScroll > 0 ? container.scrollTop / maxScroll : 0;
-      setTocPositionRatio(clampUnit(ratio));
       const nextIndex = getCurrentCenteredSlideIndex();
       if (nextIndex >= 0) {
         setActiveSlideIndex((previous) => (previous === nextIndex ? previous : nextIndex));
@@ -908,14 +1534,6 @@ export default function Home() {
       window.removeEventListener("resize", requestUpdate);
     };
   }, [embeddedSlideCount, presenterMode, selectedProject]);
-
-  useEffect(() => {
-    if (!presenterMode) {
-      return;
-    }
-    const ratio = maxSlideIndex > 0 ? activeSlideIndex / maxSlideIndex : 0;
-    setTocPositionRatio(clampUnit(ratio));
-  }, [activeSlideIndex, maxSlideIndex, presenterMode]);
 
   async function refreshState(preferredPath = ""): Promise<string> {
     const nextState = await call<AppState>("get_app_state");
@@ -970,16 +1588,23 @@ export default function Home() {
     async function registerMenuListener() {
       try {
         const { listen } = await import("@tauri-apps/api/event");
-        const cleanup = await listen(EXPORT_SKILL_MENU_EVENT, () => {
+        const cleanupOpenSettings = await listen(OPEN_SETTINGS_MENU_EVENT, () => {
+          openSettingsPanel();
+        });
+        const cleanupExportSkill = await listen(EXPORT_SKILL_MENU_EVENT, () => {
           void handleExportSkillArchive();
         });
 
         if (disposed) {
-          cleanup();
+          cleanupOpenSettings();
+          cleanupExportSkill();
           return;
         }
 
-        unlisten = cleanup;
+        unlisten = () => {
+          cleanupOpenSettings();
+          cleanupExportSkill();
+        };
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Failed to register application menu listener.";
@@ -997,6 +1622,13 @@ export default function Home() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
+      const usingCommand = event.metaKey || event.ctrlKey;
+      if (usingCommand && (event.key === "," || event.code === "Comma")) {
+        event.preventDefault();
+        openSettingsPanel();
+        return;
+      }
+
       const target = event.target as HTMLElement | null;
       const targetTag = target?.tagName;
       const isTypingTarget =
@@ -1005,7 +1637,6 @@ export default function Home() {
         return;
       }
 
-      const usingCommand = event.metaKey || event.ctrlKey;
       if (usingCommand && (event.key === "=" || event.key === "+" || event.key === "Add")) {
         event.preventDefault();
         setPreviewZoom((previous) => clampPreviewZoom(previous + PREVIEW_ZOOM_STEP));
@@ -1030,13 +1661,23 @@ export default function Home() {
         return;
       }
 
+      if (event.key === "Escape" && expandedAsset) {
+        event.preventDefault();
+        setExpandedAsset(null);
+        return;
+      }
+
       if (event.key === "Escape" && presenterMode) {
         event.preventDefault();
         setPresenterMode(false);
         window.requestAnimationFrame(() => {
-          scrollListToSlide(activeSlideIndex);
+          scrollListToSlide(activeSlideIndex, "instant");
         });
         revealPreviewDock();
+        return;
+      }
+
+      if (expandedAsset) {
         return;
       }
 
@@ -1060,7 +1701,7 @@ export default function Home() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [activeSlideIndex, maxSlideIndex, presenterMode, selectedProject, settingsOpen]);
+  }, [activeSlideIndex, expandedAsset, maxSlideIndex, presenterMode, selectedProject, settingsOpen]);
 
   function clearPreviewDockHideTimer(): void {
     if (previewDockHideTimerRef.current !== null) {
@@ -1088,7 +1729,7 @@ export default function Home() {
     if (presenterMode) {
       setPresenterMode(false);
       window.requestAnimationFrame(() => {
-        scrollListToSlide(activeSlideIndex);
+        scrollListToSlide(activeSlideIndex, "instant");
       });
       revealPreviewDock();
       return;
@@ -1131,6 +1772,20 @@ export default function Home() {
     schedulePreviewDockHide(180);
   }
 
+  async function handleOpenAsset(asset: ExpandableAsset): Promise<void> {
+    const projectPath = selectedProject?.path || "";
+    let source = asset.src;
+    try {
+      source = await resolveProjectAssetSource(projectPath, asset.src);
+    } catch {
+      source = asset.src;
+    }
+    setExpandedAsset({
+      ...asset,
+      src: source || asset.src,
+    });
+  }
+
   async function withBusy(task: () => Promise<void>): Promise<void> {
     setBusy(true);
     try {
@@ -1158,7 +1813,7 @@ export default function Home() {
   }
 
   async function handleRemoveProject(path: string): Promise<void> {
-    await withBusy(async () => {
+    try {
       const nextState = await call<AppState>("remove_project", { path });
       setAppState(nextState);
 
@@ -1167,19 +1822,26 @@ export default function Home() {
       const hasPreferred = preferredPath && nextState.projects.some((project) => project.path === preferredPath);
       const nextSelection = hasPreferred ? preferredPath : fallbackPath;
       setSelectedPath(nextSelection);
-      setPinnedPaths((previous) => previous.filter((candidate) => candidate !== path));
 
       console.log("Removed project from tracked list.");
-    });
+    } catch (error) {
+      console.error("Failed to remove project:", error);
+    }
   }
 
-  function handleTogglePin(path: string): void {
-    setPinnedPaths((previous) => {
-      if (previous.includes(path)) {
-        return previous.filter((candidate) => candidate !== path);
-      }
-      return [path, ...previous];
-    });
+  async function handleTogglePin(path: string): Promise<void> {
+    try {
+      const nextState = await call<AppState>("toggle_project_pin", { path });
+      setAppState(nextState);
+    } catch (error) {
+      console.error("Failed to toggle pin state:", error);
+    }
+  }
+
+  function openSettingsPanel(): void {
+    setExpandedAsset(null);
+    setSettingsOpen(true);
+    setSidebarOpen(true);
   }
 
   function updateToken<K extends keyof SlideTokens>(key: K, value: string): void {
@@ -1304,352 +1966,117 @@ export default function Home() {
       className={`app-shell ${sidebarOpen ? "sidebar-open" : "sidebar-closed"} ${sidebarDragging ? "sidebar-resizing" : ""}`}
       style={shellStyle}
     >
-      <button
-        type="button"
-        className="btn btn-ghost btn-icon-only sidebar-toggle-btn"
-        onClick={() => setSidebarOpen((open) => !open)}
-        aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
-      >
-        <SidebarMinimalistic size={14} weight="Linear" />
-      </button>
+      <SidebarToggleButton
+        sidebarOpen={sidebarOpen}
+        onToggle={() => setSidebarOpen((open) => !open)}
+      />
 
-      <aside className="sidebar" aria-hidden={!sidebarOpen} data-tauri-drag-region>
-        <header className="sidebar-head" data-tauri-drag-region>
-          <button
-            type="button"
-            className="btn btn-primary btn-block"
-            onClick={() => void handleOpenProjectFolder()}
-            disabled={busy || !sidebarOpen}
-          >
-            Open Project
-          </button>
-        </header>
+      <AppSidebar
+        busy={busy}
+        sidebarOpen={sidebarOpen}
+        settingsOpen={settingsOpen}
+        projectsCount={projects.length}
+        projects={projects}
+        pinnedPaths={appState?.config.pinned_projects || []}
+        selectedPath={selectedPath}
+        onBackToApp={() => setSettingsOpen(false)}
+        onOpenProject={() => {
+          void handleOpenProjectFolder();
+        }}
+        onSelectProject={setSelectedPath}
+        onRemoveProject={(path) => {
+          void handleRemoveProject(path);
+        }}
+        onTogglePin={(path) => {
+          void handleTogglePin(path);
+        }}
+        onOpenSettings={openSettingsPanel}
+      />
 
-        <section className="project-section">
-          <div className="section-title-row">
-            <h2>
-              <BoxMinimalistic
-                className="section-title-icon"
-                size={14}
-                weight="Linear"
-                aria-hidden="true"
-              />
-              <span>Projects</span>
-            </h2>
-            <span className="count-pill">{projects.length}</span>
-          </div>
-
-          <ul className="project-list" aria-label="Tracked projects">
-            {orderedProjects.map((project) => {
-              const isPinned = pinnedPaths.includes(project.path);
-              return (
-              <li
-                key={project.path}
-                className={`project-row ${project.path === selectedPath ? "active" : ""} ${isPinned ? "pinned" : ""}`}
-              >
-                <button
-                  type="button"
-                  className={`project-action project-pin ${isPinned ? "is-pinned" : ""}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleTogglePin(project.path);
-                  }}
-                  disabled={busy || !sidebarOpen}
-                  aria-label={isPinned ? `Unpin ${project.name}` : `Pin ${project.name} to top`}
-                >
-                  <Pin size={12} weight={isPinned ? "Bold" : "Linear"} />
-                </button>
-                <button
-                  type="button"
-                  className="project-select-inline"
-                  onClick={() => setSelectedPath(project.path)}
-                  disabled={busy || !sidebarOpen}
-                  title={project.path}
-                >
-                  <span className="project-title">{project.name}</span>
-                </button>
-                <button
-                  type="button"
-                  className="project-action project-remove"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    void handleRemoveProject(project.path);
-                  }}
-                  disabled={busy || !sidebarOpen}
-                  aria-label={`Remove ${project.name} from tracked projects`}
-                >
-                  <CloseCircle size={12} weight="Linear" />
-                </button>
-              </li>
-            );
-            })}
-            {projects.length === 0 && (
-              <li className="empty-row">No projects yet. Click "Open Project" to add one.</li>
-            )}
-          </ul>
-        </section>
-
-        <footer className="sidebar-foot">
-          <button
-            type="button"
-            className="settings-trigger"
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Settings"
-          >
-            <Settings size={14} weight="Linear" />
-            <span>Settings</span>
-          </button>
-        </footer>
-      </aside>
-
-      <div
-        className="sidebar-resizer"
-        role="separator"
-        aria-label="Resize sidebar"
-        aria-orientation="vertical"
-        aria-valuemin={SIDEBAR_MIN_WIDTH}
-        aria-valuemax={SIDEBAR_MAX_WIDTH}
-        aria-valuenow={sidebarWidth}
-        aria-hidden={!sidebarOpen}
+      <SidebarResizer
+        sidebarWidth={sidebarWidth}
+        sidebarOpen={sidebarOpen}
+        minWidth={SIDEBAR_MIN_WIDTH}
+        maxWidth={SIDEBAR_MAX_WIDTH}
         onPointerDown={handleSidebarResizeStart}
       />
 
-      <section className="workspace" aria-label="Preview area">
-        {selectedProject ? (
-          <div
-            className={`preview-stage ${presenterMode ? "presenter-mode single-slide-mode" : "list-slide-mode"}`}
-            onPointerMove={handlePreviewStagePointerMove}
-            onPointerLeave={handlePreviewStagePointerLeave}
-          >
-            <div className="preview-render-surface" style={previewSurfaceStyle}>
-              <div ref={previewSurfaceRef} className="embedded-preview-surface">
-                <EmbeddedDeckPreview
-                  source={selectedProjectEmbeddedSource}
-                  projectPath={selectedProject.path}
-                  presenterMode={presenterMode}
-                  activeSlideIndex={activeSlideIndex}
-                  onSlideCountChange={setEmbeddedSlideCount}
-                  onActiveSlidePick={setActiveSlideIndex}
-                  onSlideOutlineChange={setSlideOutline}
-                />
-              </div>
-            </div>
-            {slideTocEntries.length > 1 && (
-              <nav className="slides-toc-rail" aria-label="Slide table of contents">
-                <ol className="slides-toc-list">
-                  {slideTocTicks.map((tick) => {
-                    const top = `${tick.ratio * 100}%`;
-                    const isActive = tick.slideIndex === activeSlideIndex;
-                    return (
-                      <li
-                        key={tick.key}
-                        className={`slides-toc-tick ${isActive ? "active" : ""}`}
-                        style={{ top }}
-                      >
-                        <button
-                          type="button"
-                          className="slides-toc-hit"
-                          onClick={() => handleTocSelect(tick.slideIndex)}
-                          aria-label={`Go to ${tick.title}`}
-                          title={tick.title}
-                        >
-                          <span className="slides-toc-line" />
-                        </button>
-                        <span className="slides-toc-label">{tick.title}</span>
-                      </li>
-                    );
-                  })}
-                </ol>
-                <div className="slides-toc-current" style={{ top: `${tocPositionRatio * 100}%` }}>
-                  <span className="slides-toc-current-line" />
-                </div>
-              </nav>
-            )}
-            <div
-              className={`preview-mode-dock ${previewDockVisible ? "is-visible" : ""}`}
-              onPointerEnter={handlePreviewDockPointerEnter}
-              onPointerLeave={handlePreviewDockPointerLeave}
-            >
-              <button
-                type="button"
-                className={`preview-dock-toggle ${presenterMode ? "active" : ""}`}
-                onClick={togglePresenterMode}
-                aria-pressed={presenterMode}
-                aria-label={presenterMode ? "Switch to slide list mode" : "Switch to focused single-slide mode"}
-                title={presenterMode ? "Minimize to slide list" : "Maximize to single slide"}
-              >
-                {presenterMode ? (
-                  <Minimize size={16} weight="Linear" />
-                ) : (
-                  <Maximize size={16} weight="Linear" />
-                )}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="empty-center">
-            <div className="empty-state">
-              <Image
-                src="/logo-clean.png"
-                alt="FastSlides logo"
-                width={140}
-                height={130}
-                className="empty-logo"
-                priority
-              />
-              <p>No project selected</p>
-            </div>
-          </div>
-        )}
-      </section>
+      <PreviewWorkspace
+        settingsOpen={settingsOpen}
+        hasSelectedProject={Boolean(selectedProject)}
+        presenterMode={presenterMode}
+        previewSurfaceStyle={previewSurfaceStyle}
+        previewSurfaceRef={previewSurfaceRef}
+        deckPreview={
+          selectedProject ? (
+            <EmbeddedDeckPreview
+              source={selectedProjectEmbeddedSource}
+              projectPath={selectedProject.path}
+              mermaidThemeName={mermaidThemeName}
+              syntaxThemeName={syntaxThemeName}
+              uiTheme={theme}
+              presenterMode={presenterMode}
+              activeSlideIndex={activeSlideIndex}
+              onSlideCountChange={setEmbeddedSlideCount}
+              onActiveSlidePick={setActiveSlideIndex}
+              onSlideOutlineChange={setSlideOutline}
+              onAssetOpen={(asset) => {
+                void handleOpenAsset(asset);
+              }}
+            />
+          ) : null
+        }
+        slideTocEntries={slideTocEntries}
+        activeSlideIndex={activeSlideIndex}
+        onTocSelect={handleTocSelect}
+        previewDockVisible={previewDockVisible}
+        onPreviewDockPointerEnter={handlePreviewDockPointerEnter}
+        onPreviewDockPointerLeave={handlePreviewDockPointerLeave}
+        onTogglePresenterMode={togglePresenterMode}
+        onPreviewStagePointerMove={handlePreviewStagePointerMove}
+        onPreviewStagePointerLeave={handlePreviewStagePointerLeave}
+      />
 
-      {settingsOpen && (
-        <div className="settings-overlay" onClick={() => setSettingsOpen(false)}>
-          <div className="settings-dialog" onClick={(e) => e.stopPropagation()}>
-            <header className="settings-header">
-              <h2>Settings</h2>
-              <button
-                type="button"
-                className="settings-close"
-                onClick={() => setSettingsOpen(false)}
-                aria-label="Close settings"
-              >
-                <CloseCircle size={16} weight="Linear" />
-              </button>
-            </header>
-            <div className="settings-body">
-              <div className="settings-section">
-                <span className="settings-label">Theme</span>
-                <div className="theme-toggle">
-                  <button
-                    type="button"
-                    className={theme === "dark" ? "active" : ""}
-                    onClick={() => setTheme("dark")}
-                  >
-                    <Moon size={14} weight="Linear" /> Dark
-                  </button>
-                  <button
-                    type="button"
-                    className={theme === "light" ? "active" : ""}
-                    onClick={() => setTheme("light")}
-                  >
-                    <Sun size={14} weight="Linear" /> Light
-                  </button>
-                </div>
-              </div>
-              {selectedProject && (
-                <>
-                  <div className="settings-section">
-                    <span className="settings-label">Colors</span>
-                    <div className="token-grid">
-                      <label className="token-row">
-                        <span className="token-name">Background</span>
-                        <span className="color-field">
-                          <input type="color" value={hexForInput(slideTokens.slideBg)} onChange={(e) => updateToken("slideBg", e.target.value)} />
-                          <input type="text" className="color-text" value={slideTokens.slideBg} onChange={(e) => updateToken("slideBg", e.target.value)} />
-                        </span>
-                      </label>
-                      <label className="token-row">
-                        <span className="token-name">Text</span>
-                        <span className="color-field">
-                          <input type="color" value={hexForInput(slideTokens.slideFg)} onChange={(e) => updateToken("slideFg", e.target.value)} />
-                          <input type="text" className="color-text" value={slideTokens.slideFg} onChange={(e) => updateToken("slideFg", e.target.value)} />
-                        </span>
-                      </label>
-                      <label className="token-row">
-                        <span className="token-name">H1</span>
-                        <span className="color-field">
-                          <input type="color" value={hexForInput(slideTokens.slideH1Color)} onChange={(e) => updateToken("slideH1Color", e.target.value)} />
-                          <input type="text" className="color-text" value={slideTokens.slideH1Color} onChange={(e) => updateToken("slideH1Color", e.target.value)} />
-                        </span>
-                      </label>
-                      <label className="token-row">
-                        <span className="token-name">H2</span>
-                        <span className="color-field">
-                          <input type="color" value={hexForInput(slideTokens.slideH2Color)} onChange={(e) => updateToken("slideH2Color", e.target.value)} />
-                          <input type="text" className="color-text" value={slideTokens.slideH2Color} onChange={(e) => updateToken("slideH2Color", e.target.value)} />
-                        </span>
-                      </label>
-                      <label className="token-row">
-                        <span className="token-name">Body</span>
-                        <span className="color-field">
-                          <input type="color" value={hexForInput(slideTokens.slideBodyColor)} onChange={(e) => updateToken("slideBodyColor", e.target.value)} />
-                          <input type="text" className="color-text" value={slideTokens.slideBodyColor} onChange={(e) => updateToken("slideBodyColor", e.target.value)} />
-                        </span>
-                      </label>
-                      <label className="token-row">
-                        <span className="token-name">Accent</span>
-                        <span className="color-field">
-                          <input type="color" value={hexForInput(slideTokens.slideAccent)} onChange={(e) => updateToken("slideAccent", e.target.value)} />
-                          <input type="text" className="color-text" value={slideTokens.slideAccent} onChange={(e) => updateToken("slideAccent", e.target.value)} />
-                        </span>
-                      </label>
-                    </div>
-                  </div>
+      <AssetLightbox
+        asset={expandedAsset}
+        onClose={() => {
+          setExpandedAsset(null);
+        }}
+      />
 
-                  <div className="settings-section">
-                    <span className="settings-label">Palette</span>
-                    <div className="palette-row">
-                      {([["slidePalette1"], ["slidePalette2"], ["slidePalette3"], ["slidePalette4"], ["slidePalette5"]] as [keyof SlideTokens][]).map(([key]) => (
-                        <label key={key} className="palette-swatch">
-                          <input type="color" value={hexForInput(slideTokens[key])} onChange={(e) => updateToken(key, e.target.value)} />
-                          <span className="palette-preview" style={{ background: isHexColor(slideTokens[key]) ? slideTokens[key] : "#888" }} />
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="settings-section">
-                    <span className="settings-label">Typography</span>
-                    <div className="token-grid">
-                      <label className="token-row">
-                        <span className="token-name">Font</span>
-                        <select className="token-select" value={slideTokens.slideFontFamily} onChange={(e) => updateToken("slideFontFamily", e.target.value)}>
-                          {FONT_OPTIONS.map((f) => (
-                            <option key={f} value={f}>{f.split(",")[0].replace(/"/g, "")}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <label className="token-row">
-                        <span className="token-name">Heading font</span>
-                        <select className="token-select" value={slideTokens.slideHeadingFont} onChange={(e) => updateToken("slideHeadingFont", e.target.value)}>
-                          <option value="var(--slide-font-family)">Same as body</option>
-                          {FONT_OPTIONS.map((f) => (
-                            <option key={f} value={f}>{f.split(",")[0].replace(/"/g, "")}</option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                  </div>
-
-                  <div className="settings-section">
-                    <span className="settings-label">Layout</span>
-                    <div className="token-grid">
-                      <label className="token-row">
-                        <span className="token-name">Radius</span>
-                        <input type="text" className="token-input" value={slideTokens.slideRadius} onChange={(e) => updateToken("slideRadius", e.target.value)} />
-                      </label>
-                      <label className="token-row">
-                        <span className="token-name">Padding</span>
-                        <input type="text" className="token-input" value={slideTokens.slidePadding} onChange={(e) => updateToken("slidePadding", e.target.value)} />
-                      </label>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-block"
-                    onClick={() => void handleSaveCss()}
-                    disabled={busy}
-                  >
-                    Save to slides.css
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <SettingsOverlay
+        open={settingsOpen}
+        busy={busy}
+        theme={theme}
+        onThemeChange={(nextTheme) => setTheme(nextTheme)}
+        mermaidThemeName={mermaidThemeName}
+        mermaidThemeOptions={MERMAID_THEME_OPTIONS}
+        mermaidThemeLabels={MERMAID_THEME_LABELS}
+        onMermaidThemeChange={(value) => {
+          if (isMermaidThemeName(value)) {
+            setMermaidThemeName(value);
+          }
+        }}
+        syntaxThemeName={syntaxThemeName}
+        syntaxThemeOptionsByMode={SYNTAX_THEME_OPTIONS_BY_MODE}
+        syntaxThemeLabels={SYNTAX_THEME_LABELS}
+        onSyntaxThemeChange={(value) => {
+          if (isSyntaxThemeName(value)) {
+            setSyntaxThemeName(value);
+          }
+        }}
+        selectedProject={Boolean(selectedProject)}
+        slideTokens={slideTokens}
+        onUpdateToken={(key, value) => updateToken(key as keyof SlideTokens, value)}
+        onSaveCss={() => {
+          void handleSaveCss();
+        }}
+        fontOptions={FONT_OPTIONS}
+        monoFontOptions={MONO_FONT_OPTIONS}
+        fontLabel={fontLabel}
+        hexForInput={hexForInput}
+        isHexColor={isHexColor}
+      />
     </main>
   );
 }

@@ -24,6 +24,8 @@ const DEFAULT_SUBTITLE: &str = "Project Overview";
 const DEFAULT_DATE_LABEL: &str = "Month YYYY";
 const DEFAULT_PREVIEW_BASE_URL: &str = "http://127.0.0.1:34773";
 const DEFAULT_AGENT_HOOK_ADDR: &str = "127.0.0.1:38473";
+const MENU_OPEN_SETTINGS_ID: &str = "menu.open_settings";
+const MENU_OPEN_SETTINGS_EVENT: &str = "fastslides://open-settings";
 const MENU_EXPORT_SKILL_ID: &str = "menu.export_fastslides_skill";
 const MENU_EXPORT_SKILL_EVENT: &str = "fastslides://export-skill";
 const DEFAULT_SLIDES_CSS: &str = "\
@@ -41,11 +43,18 @@ const DEFAULT_SLIDES_CSS: &str = "\
   --slide-border: rgba(239, 239, 235, 0.12);
   --slide-radius: 10px;
   --slide-padding: 32px;
+  --slide-layout-gap: 16px;
+  --slide-card-bg: rgba(255, 255, 255, 0.03);
+  --slide-card-border: rgba(239, 239, 235, 0.12);
+  --slide-card-radius: 10px;
+  --slide-card-padding: 16px;
 
   /* ── Typography ── */
   --slide-font-family: \"Inter\", system-ui, sans-serif;
   --slide-heading-font: var(--slide-font-family);
   --slide-code-font: \"Fira Code\", monospace;
+  --slide-meta-font: var(--slide-code-font);
+  --slide-meta-size: 0.78rem;
 
   /* ── Colors ── */
   --slide-fg: #edecec;
@@ -53,6 +62,7 @@ const DEFAULT_SLIDES_CSS: &str = "\
   --slide-h2-color: #d7d6d5;
   --slide-h3-color: #b0afab;
   --slide-body-color: #c4c3bf;
+  --slide-meta-color: rgba(196, 195, 191, 0.88);
   --slide-accent: #7b9cbc;
   --slide-link-color: var(--slide-accent);
   --slide-code-bg: rgba(255, 255, 255, 0.06);
@@ -72,6 +82,8 @@ struct AppConfig {
     projects_roots: Vec<String>,
     #[serde(default)]
     recent_projects: Vec<String>,
+    #[serde(default)]
+    pinned_projects: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -274,6 +286,7 @@ fn load_config() -> Result<AppConfig, String> {
                 return Ok(AppConfig {
                     projects_roots: vec![path_to_string(&path)],
                     recent_projects: Vec::new(),
+                    pinned_projects: Vec::new(),
                 });
             }
         }
@@ -324,9 +337,21 @@ fn normalized_config(mut config: AppConfig) -> AppConfig {
         }
     }
 
+    let mut deduped_pinned = Vec::<String>::new();
+    let mut seen_pinned = HashSet::<String>::new();
+    for project in config.pinned_projects.drain(..) {
+        if let Ok(canonical) = normalize_existing_project_directory(&project) {
+            let canonical_str = path_to_string(&canonical);
+            if seen_pinned.insert(canonical_str.clone()) {
+                deduped_pinned.push(canonical_str);
+            }
+        }
+    }
+
     AppConfig {
         projects_roots: deduped_roots,
         recent_projects: deduped_recent,
+        pinned_projects: deduped_pinned,
     }
 }
 
@@ -962,6 +987,15 @@ fn remove_project(path: String) -> Result<AppState, String> {
             .unwrap_or(false);
         !(matches_input || matches_canonical)
     });
+    
+    config.pinned_projects.retain(|project| {
+        let matches_input = project == &expanded;
+        let matches_canonical = canonical
+            .as_ref()
+            .map(|resolved| project == resolved)
+            .unwrap_or(false);
+        !(matches_input || matches_canonical)
+    });
 
     save_config(&config)?;
     Ok(AppState {
@@ -1033,6 +1067,25 @@ fn create_project(
     remember_recent_project(&mut config, &project_path);
     save_config(&config)?;
     project_detail_for_path(&config, &project_path)
+}
+
+#[tauri::command]
+fn toggle_project_pin(path: String) -> Result<AppState, String> {
+    let project_path = normalize_existing_project_directory(&path)?;
+    let mut config = normalized_config(load_config()?);
+    let canonical_str = path_to_string(&project_path);
+    
+    if config.pinned_projects.contains(&canonical_str) {
+        config.pinned_projects.retain(|p| p != &canonical_str);
+    } else {
+        config.pinned_projects.push(canonical_str);
+    }
+    
+    save_config(&config)?;
+    Ok(AppState {
+        projects: list_projects(&config),
+        config,
+    })
 }
 
 #[tauri::command]
@@ -1239,6 +1292,13 @@ fn build_app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result
     {
         let items = menu.items()?;
         if let Some(app_submenu) = items.first().and_then(|item| item.as_submenu()) {
+            let settings_item = MenuItem::with_id(
+                app,
+                MENU_OPEN_SETTINGS_ID,
+                "Settings…",
+                true,
+                Some("CmdOrCtrl+,"),
+            )?;
             let export_item = MenuItem::with_id(
                 app,
                 MENU_EXPORT_SKILL_ID,
@@ -1247,8 +1307,9 @@ fn build_app_menu<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> tauri::Result
                 None::<&str>,
             )?;
             let separator = PredefinedMenuItem::separator(app)?;
-            app_submenu.insert(&separator, 2)?;
-            app_submenu.insert(&export_item, 3)?;
+            app_submenu.insert(&settings_item, 2)?;
+            app_submenu.insert(&separator, 3)?;
+            app_submenu.insert(&export_item, 4)?;
         }
     }
 
@@ -1415,7 +1476,11 @@ pub fn run() {
     tauri::Builder::default()
         .menu(|app| build_app_menu(app))
         .on_menu_event(|app, event| {
-            if event.id() == MENU_EXPORT_SKILL_ID {
+            if event.id() == MENU_OPEN_SETTINGS_ID {
+                if let Err(error) = app.emit(MENU_OPEN_SETTINGS_EVENT, ()) {
+                    log::warn!("Failed to emit settings menu event: {}", error);
+                }
+            } else if event.id() == MENU_EXPORT_SKILL_ID {
                 if let Err(error) = app.emit(MENU_EXPORT_SKILL_EVENT, ()) {
                     log::warn!("Failed to emit skill export menu event: {}", error);
                 }
@@ -1453,7 +1518,8 @@ pub fn run() {
             save_project,
             save_project_css,
             resolve_project_asset_data_url,
-            validate_project
+            validate_project,
+            toggle_project_pin
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
