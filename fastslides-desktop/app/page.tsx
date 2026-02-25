@@ -102,6 +102,119 @@ const SELECTED_STATE_KEY = "fastslides_selected_path";
 const SIDEBAR_WIDTH_STATE_KEY = "fastslides_sidebar_width";
 const PINNED_STATE_KEY = "fastslides_pinned_paths";
 const THEME_STATE_KEY = "fastslides_theme";
+
+type SlideTokens = {
+  slideBg: string;
+  slideBorder: string;
+  slideRadius: string;
+  slidePadding: string;
+  slideFontFamily: string;
+  slideHeadingFont: string;
+  slideCodeFont: string;
+  slideFg: string;
+  slideH1Color: string;
+  slideH2Color: string;
+  slideH3Color: string;
+  slideBodyColor: string;
+  slideAccent: string;
+  slideLinkColor: string;
+  slideCodeBg: string;
+  slidePalette1: string;
+  slidePalette2: string;
+  slidePalette3: string;
+  slidePalette4: string;
+  slidePalette5: string;
+};
+
+const DEFAULT_TOKENS: SlideTokens = {
+  slideBg: "#0e0d0a",
+  slideBorder: "rgba(239, 239, 235, 0.12)",
+  slideRadius: "10px",
+  slidePadding: "32px",
+  slideFontFamily: '"Inter", system-ui, sans-serif',
+  slideHeadingFont: "var(--slide-font-family)",
+  slideCodeFont: '"Fira Code", monospace',
+  slideFg: "#edecec",
+  slideH1Color: "#ffffff",
+  slideH2Color: "#d7d6d5",
+  slideH3Color: "#b0afab",
+  slideBodyColor: "#c4c3bf",
+  slideAccent: "#7b9cbc",
+  slideLinkColor: "var(--slide-accent)",
+  slideCodeBg: "rgba(255, 255, 255, 0.06)",
+  slidePalette1: "#7b9cbc",
+  slidePalette2: "#63b18a",
+  slidePalette3: "#e1b86f",
+  slidePalette4: "#d68080",
+  slidePalette5: "#b08cd6",
+};
+
+const TOKEN_TO_VAR: Record<keyof SlideTokens, string> = {
+  slideBg: "--slide-bg",
+  slideBorder: "--slide-border",
+  slideRadius: "--slide-radius",
+  slidePadding: "--slide-padding",
+  slideFontFamily: "--slide-font-family",
+  slideHeadingFont: "--slide-heading-font",
+  slideCodeFont: "--slide-code-font",
+  slideFg: "--slide-fg",
+  slideH1Color: "--slide-h1-color",
+  slideH2Color: "--slide-h2-color",
+  slideH3Color: "--slide-h3-color",
+  slideBodyColor: "--slide-body-color",
+  slideAccent: "--slide-accent",
+  slideLinkColor: "--slide-link-color",
+  slideCodeBg: "--slide-code-bg",
+  slidePalette1: "--slide-palette-1",
+  slidePalette2: "--slide-palette-2",
+  slidePalette3: "--slide-palette-3",
+  slidePalette4: "--slide-palette-4",
+  slidePalette5: "--slide-palette-5",
+};
+
+const FONT_OPTIONS = [
+  '"Inter", system-ui, sans-serif',
+  '"Helvetica Neue", Helvetica, Arial, sans-serif',
+  'Georgia, "Times New Roman", serif',
+  '"Fira Code", monospace',
+  'system-ui, sans-serif',
+];
+
+function parseCssToTokens(css: string): Partial<SlideTokens> {
+  const result: Partial<SlideTokens> = {};
+  const varToToken = Object.fromEntries(
+    Object.entries(TOKEN_TO_VAR).map(([k, v]) => [v, k]),
+  );
+  const re = /--([\w-]+)\s*:\s*(.+?)\s*;/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(css)) !== null) {
+    const varName = `--${m[1]}`;
+    const tokenKey = varToToken[varName] as keyof SlideTokens | undefined;
+    if (tokenKey) result[tokenKey] = m[2];
+  }
+  return result;
+}
+
+function tokensToCss(tokens: SlideTokens): string {
+  const lines = Object.entries(TOKEN_TO_VAR).map(
+    ([key, varName]) => `  ${varName}: ${tokens[key as keyof SlideTokens]};`,
+  );
+  return `:root {\n${lines.join("\n")}\n}\n`;
+}
+
+function isHexColor(v: string): boolean {
+  return /^#[0-9a-fA-F]{3,8}$/.test(v.trim());
+}
+
+function hexForInput(v: string): string {
+  const t = v.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(t)) return t;
+  if (/^#[0-9a-fA-F]{3}$/.test(t)) {
+    const [, a, b, c] = t;
+    return `#${a}${a}${b}${b}${c}${c}`;
+  }
+  return "#000000";
+}
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 420;
 const EXPORT_SKILL_MENU_EVENT = "fastslides://export-skill";
@@ -473,6 +586,7 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [projectCss, setProjectCss] = useState("");
   const [cssEditorValue, setCssEditorValue] = useState("");
+  const [slideTokens, setSlideTokens] = useState<SlideTokens>({ ...DEFAULT_TOKENS });
   const sidebarResizeCleanupRef = useRef<(() => void) | null>(null);
   const previewDockHideTimerRef = useRef<number | null>(null);
   const previewDockHoveringRef = useRef(false);
@@ -663,12 +777,14 @@ export default function Home() {
         if (!cancelled) {
           setProjectCss(css);
           setCssEditorValue(css);
+          setSlideTokens({ ...DEFAULT_TOKENS, ...parseCssToTokens(css) });
         }
       })
       .catch(() => {
         if (!cancelled) {
           setProjectCss("");
           setCssEditorValue("");
+          setSlideTokens({ ...DEFAULT_TOKENS });
         }
       });
     return () => { cancelled = true; };
@@ -1066,11 +1182,23 @@ export default function Home() {
     });
   }
 
+  function updateToken<K extends keyof SlideTokens>(key: K, value: string): void {
+    setSlideTokens((prev) => {
+      const next = { ...prev, [key]: value };
+      const css = tokensToCss(next);
+      setProjectCss(css);
+      setCssEditorValue(css);
+      return next;
+    });
+  }
+
   async function handleSaveCss(): Promise<void> {
     if (!selectedProject) return;
+    const css = tokensToCss(slideTokens);
     await withBusy(async () => {
-      await call<void>("save_project_css", { path: selectedProject.path, css: cssEditorValue });
-      setProjectCss(cssEditorValue);
+      await call<void>("save_project_css", { path: selectedProject.path, css });
+      setProjectCss(css);
+      setCssEditorValue(css);
     });
   }
 
@@ -1410,27 +1538,113 @@ export default function Home() {
                 </div>
               </div>
               {selectedProject && (
-                <div className="settings-section">
-                  <span className="settings-label">Slide Styles</span>
-                  <p className="settings-hint">
-                    slides.css for {selectedProject.name} — edit --slide-* variables
-                  </p>
-                  <textarea
-                    className="css-editor"
-                    value={cssEditorValue}
-                    onChange={(e) => setCssEditorValue(e.target.value)}
-                    spellCheck={false}
-                    placeholder={":root {\n  --slide-bg: #1a1a2e;\n  --slide-h1-color: #e2e8f0;\n}"}
-                  />
+                <>
+                  <div className="settings-section">
+                    <span className="settings-label">Colors</span>
+                    <div className="token-grid">
+                      <label className="token-row">
+                        <span className="token-name">Background</span>
+                        <span className="color-field">
+                          <input type="color" value={hexForInput(slideTokens.slideBg)} onChange={(e) => updateToken("slideBg", e.target.value)} />
+                          <input type="text" className="color-text" value={slideTokens.slideBg} onChange={(e) => updateToken("slideBg", e.target.value)} />
+                        </span>
+                      </label>
+                      <label className="token-row">
+                        <span className="token-name">Text</span>
+                        <span className="color-field">
+                          <input type="color" value={hexForInput(slideTokens.slideFg)} onChange={(e) => updateToken("slideFg", e.target.value)} />
+                          <input type="text" className="color-text" value={slideTokens.slideFg} onChange={(e) => updateToken("slideFg", e.target.value)} />
+                        </span>
+                      </label>
+                      <label className="token-row">
+                        <span className="token-name">H1</span>
+                        <span className="color-field">
+                          <input type="color" value={hexForInput(slideTokens.slideH1Color)} onChange={(e) => updateToken("slideH1Color", e.target.value)} />
+                          <input type="text" className="color-text" value={slideTokens.slideH1Color} onChange={(e) => updateToken("slideH1Color", e.target.value)} />
+                        </span>
+                      </label>
+                      <label className="token-row">
+                        <span className="token-name">H2</span>
+                        <span className="color-field">
+                          <input type="color" value={hexForInput(slideTokens.slideH2Color)} onChange={(e) => updateToken("slideH2Color", e.target.value)} />
+                          <input type="text" className="color-text" value={slideTokens.slideH2Color} onChange={(e) => updateToken("slideH2Color", e.target.value)} />
+                        </span>
+                      </label>
+                      <label className="token-row">
+                        <span className="token-name">Body</span>
+                        <span className="color-field">
+                          <input type="color" value={hexForInput(slideTokens.slideBodyColor)} onChange={(e) => updateToken("slideBodyColor", e.target.value)} />
+                          <input type="text" className="color-text" value={slideTokens.slideBodyColor} onChange={(e) => updateToken("slideBodyColor", e.target.value)} />
+                        </span>
+                      </label>
+                      <label className="token-row">
+                        <span className="token-name">Accent</span>
+                        <span className="color-field">
+                          <input type="color" value={hexForInput(slideTokens.slideAccent)} onChange={(e) => updateToken("slideAccent", e.target.value)} />
+                          <input type="text" className="color-text" value={slideTokens.slideAccent} onChange={(e) => updateToken("slideAccent", e.target.value)} />
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="settings-section">
+                    <span className="settings-label">Palette</span>
+                    <div className="palette-row">
+                      {([["slidePalette1"], ["slidePalette2"], ["slidePalette3"], ["slidePalette4"], ["slidePalette5"]] as [keyof SlideTokens][]).map(([key]) => (
+                        <label key={key} className="palette-swatch">
+                          <input type="color" value={hexForInput(slideTokens[key])} onChange={(e) => updateToken(key, e.target.value)} />
+                          <span className="palette-preview" style={{ background: isHexColor(slideTokens[key]) ? slideTokens[key] : "#888" }} />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="settings-section">
+                    <span className="settings-label">Typography</span>
+                    <div className="token-grid">
+                      <label className="token-row">
+                        <span className="token-name">Font</span>
+                        <select className="token-select" value={slideTokens.slideFontFamily} onChange={(e) => updateToken("slideFontFamily", e.target.value)}>
+                          {FONT_OPTIONS.map((f) => (
+                            <option key={f} value={f}>{f.split(",")[0].replace(/"/g, "")}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="token-row">
+                        <span className="token-name">Heading font</span>
+                        <select className="token-select" value={slideTokens.slideHeadingFont} onChange={(e) => updateToken("slideHeadingFont", e.target.value)}>
+                          <option value="var(--slide-font-family)">Same as body</option>
+                          {FONT_OPTIONS.map((f) => (
+                            <option key={f} value={f}>{f.split(",")[0].replace(/"/g, "")}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="settings-section">
+                    <span className="settings-label">Layout</span>
+                    <div className="token-grid">
+                      <label className="token-row">
+                        <span className="token-name">Radius</span>
+                        <input type="text" className="token-input" value={slideTokens.slideRadius} onChange={(e) => updateToken("slideRadius", e.target.value)} />
+                      </label>
+                      <label className="token-row">
+                        <span className="token-name">Padding</span>
+                        <input type="text" className="token-input" value={slideTokens.slidePadding} onChange={(e) => updateToken("slidePadding", e.target.value)} />
+                      </label>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
-                    className="btn btn-primary"
+                    className="btn btn-primary btn-block"
                     onClick={() => void handleSaveCss()}
                     disabled={busy}
                   >
-                    Save
+                    Save to slides.css
                   </button>
-                </div>
+                </>
               )}
             </div>
           </div>
