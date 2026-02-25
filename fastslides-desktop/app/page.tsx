@@ -33,11 +33,6 @@ import { AssetLightbox } from "./components/overlays/AssetLightbox";
 import { SettingsOverlay } from "./components/settings/SettingsOverlay";
 import { PreviewWorkspace } from "./components/workspace/PreviewWorkspace";
 
-type AppConfig = {
-  projects_roots: string[];
-  recent_projects: string[];
-};
-
 type ProjectSummary = {
   name: string;
   path: string;
@@ -55,15 +50,15 @@ type ProjectDetail = {
   updated_at: number;
 };
 
-type AppState = {
-  config: AppConfig;
-  projects: ProjectSummary[];
-};
-
 type AppConfig = {
   projects_roots: string[];
   recent_projects: string[];
   pinned_projects: string[];
+};
+
+type AppState = {
+  config: AppConfig;
+  projects: ProjectSummary[];
 };
 
 type SlideOutlineEntry = {

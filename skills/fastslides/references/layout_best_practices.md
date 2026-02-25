@@ -15,6 +15,25 @@
   - two-column comparison (`split` + `col`)
   - narrative + visual (chart/image/video)
 
+## Constrained component surface
+
+Use these MDX components as the default layout API:
+
+- `<Stack gap="md|lg|...">`: vertical composition
+- `<Row gap="md|lg|..." align="start|center|end|stretch">`: horizontal composition
+- `<Grid cols={1|2|3} gap="md|lg|...">`: bounded grid layouts
+- `<Card title="..." subtitle="..." tone="default|accent|success|warning|danger">`: consistent panel
+- `<Metric label="..." value="..." hint="...">`: KPI-style callout
+- `<Caption>...</Caption>`: small informational/meta text
+
+Token-driven conformity (in `slides.css`):
+
+- `--slide-layout-gap`
+- `--slide-card-bg`, `--slide-card-border`, `--slide-card-radius`, `--slide-card-padding`
+- `--slide-meta-font`, `--slide-meta-size`, `--slide-meta-color`
+
+Prefer these primitives over arbitrary utility class mixes for better visual consistency.
+
 ## Density heuristics
 
 Use these as practical limits, not hard law:

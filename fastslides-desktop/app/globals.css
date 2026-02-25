@@ -355,6 +355,7 @@ textarea {
  * Reduced motion: all transitions disabled in prefers-reduced-motion.
  */
 .sidebar {
+  position: relative;
   width: var(--sidebar-runtime-width, var(--size-sidebar-width));
   height: 100vh;
   flex-shrink: 0;
@@ -376,6 +377,16 @@ textarea {
     padding-left var(--transition-slow),
     padding-right var(--transition-slow),
     border-right-color var(--transition-slow);
+}
+
+.sidebar-drag-region {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--space-5) + 30px);
+  flex-shrink: 0;
+  pointer-events: auto;
 }
 
 .sidebar > * {

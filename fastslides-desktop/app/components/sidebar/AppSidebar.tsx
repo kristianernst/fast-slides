@@ -40,6 +40,7 @@ export function AppSidebar({
 
   return (
     <aside className="sidebar" aria-hidden={!sidebarOpen}>
+      <div className="sidebar-drag-region" data-tauri-drag-region aria-hidden="true" />
       {settingsOpen ? (
         <div className="sidebar-settings-only" data-tauri-drag-region>
           <button

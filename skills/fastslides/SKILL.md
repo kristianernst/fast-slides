@@ -15,6 +15,14 @@ Use this skill for a desktop-first workflow:
 
 This skill is intentionally minimal: one main script + core validators.
 
+## Prerequisites
+
+- FastSlides Desktop is running when using hook-backed commands.
+- `npx` is installed for Playwright-based screenshot capture.
+- Playwright wrapper script exists at one of:
+  - `$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh`
+  - `~/.agents/skills/playwright/scripts/playwright_cli.sh`
+
 ## Main Command
 
 Use a single entry point:
@@ -31,6 +39,7 @@ Commands:
 - `open-project --path <absolute-project-path>`
 - `validate-project --path <absolute-project-path>`
 - `preview-url --path <absolute-project-path>`
+- `inspect-slide --path <absolute-project-path> [--slide N] [--output-dir DIR] [--headed]`: capture slide screenshot via Playwright
 - `init ...`: forward to `init_deck_project.sh`
 - `validate-local ...`: run `validate_deck_project.py`
 - `asset-audit ...`: run `asset_audit.py`
@@ -62,6 +71,14 @@ bash scripts/fastslides.sh validate-project --path /absolute/path/to/project-fol
 bash scripts/fastslides.sh validate-local --project-dir /absolute/path/to/project-folder
 bash scripts/fastslides.sh asset-audit --project-dir /absolute/path/to/project-folder --top 10
 ```
+
+5. Visually inspect slide output (recommended for every agent-generated deck):
+
+```bash
+bash scripts/fastslides.sh inspect-slide --path /absolute/path/to/project-folder --slide 1
+```
+
+The command prints an absolute PNG path. Agents should open that image and verify layout, clipping, hierarchy, and readability.
 
 ## Project Scaffold
 
@@ -111,8 +128,10 @@ Slides should use:
 - Avoid overflow; split dense content into more slides.
 - Keep heading hierarchy clear.
 - Keep assets inside the project folder.
+- Run both structural validation and visual inspection before hand-off.
 
 ## References
 
 - Runtime + hook behavior: `references/deck_mdx_runtime.md`
 - Layout guidance: `references/layout_best_practices.md`
+- Visual QA workflow: `references/visual_inspection.md`

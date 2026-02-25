@@ -5,7 +5,7 @@
   --slide-padding: 32px;
   --slide-layout-gap: 16px;
   --slide-card-bg: rgba(255, 255, 255, 0.03);
-  --slide-card-border: rgba(239, 239, 235, 0.12);
+  --slide-card-border: rgba(239, 239, 235, 0.0);
   --slide-card-radius: 10px;
   --slide-card-padding: 16px;
   --slide-font-family: "Inter", system-ui, sans-serif;

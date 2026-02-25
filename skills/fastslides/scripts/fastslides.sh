@@ -17,6 +17,8 @@ Commands:
   validate-project --path <absolute-project-path>
                                                 Run desktop validation for a project
   preview-url --path <absolute-project-path>   Build preview URL for a project path
+  inspect-slide --path <absolute-project-path> [--slide N] [--output-dir DIR] [--headed]
+                                                Open preview URL and capture slide screenshot via Playwright
   init [init_deck_project args...]             Scaffold a new deck project
   validate-local [validate_deck_project args...] 
                                                 Run local structural validation
@@ -231,6 +233,9 @@ case "${cmd}" in
     ;;
   preview-url)
     hook_preview_url "$@"
+    ;;
+  inspect-slide)
+    forward_script "inspect_slide.sh" "$@"
     ;;
   init)
     forward_script "init_deck_project.sh" "$@"
