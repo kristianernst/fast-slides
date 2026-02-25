@@ -1038,9 +1038,6 @@ function EmbeddedDeckPreview({
     previousActiveSlideRef.current = -1;
     onSlideCountChange(slides.length);
     root.classList.remove("embedded-preview-single");
-    // #region agent log
-    fetch('http://127.0.0.1:7637/ingest/fbbbe842-bb8a-48b9-afb2-b7aedf00ea7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1da6c6'},body:JSON.stringify({sessionId:'1da6c6',runId:'run1',hypothesisId:'2',location:'app/page.tsx:EmbeddedDeckPreview_useEffect',message:'Removed embedded-preview-single on load',data:{presenterMode},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
 
     const nextOutline: SlideOutlineEntry[] = [];
     for (let index = 0; index < slides.length; index += 1) {
@@ -1346,9 +1343,6 @@ export default function Home() {
   }, [slideOutline, visibleSlideCount]);
 
   useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7637/ingest/fbbbe842-bb8a-48b9-afb2-b7aedf00ea7a',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'1da6c6'},body:JSON.stringify({sessionId:'1da6c6',runId:'run1',hypothesisId:'1',location:'app/page.tsx:useEffect_project_change',message:'Project changed',data:{presenterMode},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     setActiveSlideIndex(0);
     setEmbeddedSlideCount(0);
     setSlideOutline([]);
