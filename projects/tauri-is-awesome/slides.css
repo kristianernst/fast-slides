@@ -1,0 +1,22 @@
+:root {
+  --slide-bg: #2d1b4e;
+  --slide-border: rgba(239, 239, 235, 0.12);
+  --slide-radius: 10px;
+  --slide-padding: 32px;
+  --slide-font-family: "Inter", system-ui, sans-serif;
+  --slide-heading-font: var(--slide-font-family);
+  --slide-code-font: "Fira Code", monospace;
+  --slide-fg: #edecec;
+  --slide-h1-color: #00e5ff;
+  --slide-h2-color: #d7d6d5;
+  --slide-h3-color: #b0afab;
+  --slide-body-color: #c4c3bf;
+  --slide-accent: #7b9cbc;
+  --slide-link-color: var(--slide-accent);
+  --slide-code-bg: rgba(255, 255, 255, 0.06);
+  --slide-palette-1: #7b9cbc;
+  --slide-palette-2: #63b18a;
+  --slide-palette-3: #e1b86f;
+  --slide-palette-4: #d68080;
+  --slide-palette-5: #b08cd6;
+}
