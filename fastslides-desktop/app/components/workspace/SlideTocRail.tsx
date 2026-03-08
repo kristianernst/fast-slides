@@ -3,6 +3,7 @@
 export type SlideTocEntry = {
   index: number;
   title: string;
+  status?: "loading" | "ready" | "error";
 };
 
 type SlideTocRailProps = {
@@ -11,7 +12,11 @@ type SlideTocRailProps = {
   onSelect: (index: number) => void;
 };
 
-export function SlideTocRail({ entries, activeIndex, onSelect }: SlideTocRailProps) {
+export function SlideTocRail({
+  entries,
+  activeIndex,
+  onSelect,
+}: SlideTocRailProps) {
   if (entries.length <= 1) {
     return null;
   }
@@ -22,7 +27,10 @@ export function SlideTocRail({ entries, activeIndex, onSelect }: SlideTocRailPro
         {entries.map((entry) => {
           const isActive = entry.index === activeIndex;
           return (
-            <li key={`toc-${entry.index}`} className={`slides-toc-tick ${isActive ? "active" : ""}`}>
+            <li
+              key={`toc-${entry.index}`}
+              className={`slides-toc-tick ${isActive ? "active" : ""} ${entry.status ? `is-${entry.status}` : ""}`}
+            >
               <button
                 type="button"
                 className="slides-toc-hit"

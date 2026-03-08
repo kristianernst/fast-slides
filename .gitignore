@@ -13,3 +13,6 @@
 *.pyc
 **temp**
 .cursor/
+.playwright-cli/
+projects/
+output/

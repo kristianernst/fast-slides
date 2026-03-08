@@ -5,66 +5,80 @@ description: Build and QA folder-based MDX decks for FastSlides Desktop. Use whe
 
 # FastSlides
 
-## Overview
+Use this skill when an agent needs to create, edit, validate, or visually inspect a FastSlides deck.
 
-Use this skill for a desktop-first workflow:
+## Defaults
 
-- FastSlides Desktop loads project folders directly.
-- When the app is running, the local hook server is available.
-- Agents should primarily interact through that server.
+- FastSlides Desktop is the runtime.
+- The desktop hook and embedded MCP are the source of truth while the app is running.
+- The supported slide contract is `Canvas` + `Area`.
+- Prefer existing recipes and compositions before inventing raw layouts.
+- Validate structurally, then inspect visually.
 
-This skill is intentionally minimal: one main script + core validators.
+## Entry Point
 
-## Prerequisites
-
-- FastSlides Desktop is running when using hook-backed commands.
-- `npx` is installed for Playwright-based screenshot capture.
-- Playwright wrapper script exists at one of:
-  - `$CODEX_HOME/skills/playwright/scripts/playwright_cli.sh`
-  - `~/.agents/skills/playwright/scripts/playwright_cli.sh`
-
-## Main Command
-
-Use a single entry point:
+Run everything through:
 
 ```bash
 bash scripts/fastslides.sh <command> [options]
 ```
 
-Commands:
+Core commands:
 
-- `desktop [--install]`: run FastSlides Desktop (`tauri:dev`)
-- `health`: hook server health
-- `state`: hook server app state
+- `desktop`
+- `health`
+- `state`
+- `design-system`
+- `component-catalog`
+- `component-template --name <name>`
+- `composition-template --name <name>`
+- `recipe-template --name <name>`
 - `open-project --path <absolute-project-path>`
 - `validate-project --path <absolute-project-path>`
 - `preview-url --path <absolute-project-path>`
-- `inspect-slide --path <absolute-project-path> [--slide N] [--output-dir DIR] [--headed]`: capture slide screenshot via Playwright
-- `init ...`: forward to `init_deck_project.sh`
-- `validate-local ...`: run `validate_deck_project.py`
-- `asset-audit ...`: run `asset_audit.py`
+- `inspect-slide --path <absolute-project-path> [--slide N]`
+- `smoke --path <absolute-project-path> [--slide N]`
+- `mcp-smoke`
+- `init`
+- `validate-local`
+- `asset-audit`
 
-## Typical Flow
+## Runtime Contract
 
-1. Start the app:
+- Hook API: `http://127.0.0.1:38473`
+- MCP endpoint: `http://127.0.0.1:38474/mcp`
+- Default browser preview: `http://127.0.0.1:1420`
+- `preview-url`, `inspect-slide`, and `smoke` require the browser preview to be reachable
+- `FASTSLIDES_PREVIEW_URL` can override the preview host/base
+
+## Working Loop
+
+1. Start the app if needed:
 
 ```bash
 bash scripts/fastslides.sh desktop
 ```
 
-2. Check server:
+2. Confirm the hook is up:
 
 ```bash
 bash scripts/fastslides.sh health
 ```
 
-3. Open a deck:
+3. Read the available system before writing slides:
+
+```bash
+bash scripts/fastslides.sh design-system
+bash scripts/fastslides.sh component-catalog
+```
+
+4. Open the deck:
 
 ```bash
 bash scripts/fastslides.sh open-project --path /absolute/path/to/project-folder
 ```
 
-4. Validate through app and locally:
+5. Validate through the app and local validators:
 
 ```bash
 bash scripts/fastslides.sh validate-project --path /absolute/path/to/project-folder
@@ -72,41 +86,39 @@ bash scripts/fastslides.sh validate-local --project-dir /absolute/path/to/projec
 bash scripts/fastslides.sh asset-audit --project-dir /absolute/path/to/project-folder --top 10
 ```
 
-5. Visually inspect slide output (recommended for every agent-generated deck):
+6. Inspect changed slides when layout or styling changed:
 
 ```bash
 bash scripts/fastslides.sh inspect-slide --path /absolute/path/to/project-folder --slide 1
 ```
 
-The command prints an absolute PNG path. Agents should open that image and verify layout, clipping, hierarchy, and readability.
-
-## Project Scaffold
-
-Create a new deck folder:
+If you need one command for readiness plus capture, use:
 
 ```bash
-bash scripts/fastslides.sh init --project-dir /absolute/path/to/project-folder
+bash scripts/fastslides.sh smoke --path /absolute/path/to/project-folder --slide 1
 ```
 
-or named mode:
+## Authoring Rules
 
-```bash
-bash scripts/fastslides.sh init --project my-deck --projects-dir /absolute/path/to/projects
-```
+- Start from a recipe or composition when one exists.
+- Fall back to raw `Area` placement only when the existing system cannot express the slide well.
+- Keep one conclusion per slide.
+- Use empty space intentionally; do not fill the grid because it is available.
+- Treat overflow, clipping, and dense commentary rails as failures.
+- Keep assets inside the project folder and use relative paths.
 
 ## Deck Contract
-
-Each deck folder should contain:
 
 ```text
 <project>/
   page.mdx
+  slides.css
   images/
   media/
   data/
 ```
 
-Frontmatter in `page.mdx`:
+`page.mdx` should include frontmatter like:
 
 ```yaml
 ---
@@ -117,21 +129,15 @@ date: "Month YYYY"
 ---
 ```
 
-Slides should use:
+Each slide should use:
 
-- `<section className="slide">...</section>` blocks
-- relative asset paths only
+- `<section className="slide">`
+- one `Canvas`
+- `Area` regions for layout
 
-## Quality Rules
+## Agent Stance
 
-- Keep one key message per slide.
-- Avoid overflow; split dense content into more slides.
-- Keep heading hierarchy clear.
-- Keep assets inside the project folder.
-- Run both structural validation and visual inspection before hand-off.
-
-## References
-
-- Runtime + hook behavior: `references/deck_mdx_runtime.md`
-- Layout guidance: `references/layout_best_practices.md`
-- Visual QA workflow: `references/visual_inspection.md`
+- Be expressive in the slide content, not random in the layout system.
+- Prefer strong composition over many decorative primitives.
+- Use the running app and MCP to inspect what exists before adding new structure.
+- Hand off only after validation and visual inspection both pass.

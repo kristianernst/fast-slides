@@ -2,124 +2,197 @@
 project: "tauri-is-awesome"
 title: "Tauri Is Awesome"
 subtitle: "Small binaries, native power"
-date: "February 2026"
+date: "March 2026"
 ---
+
 <main className="deck">
 
 <section className="slide">
+  <Canvas cols={50} rows={25} gap="1px">
+    <Area x={2} y={2} w={14} h={1}>
+      <Kicker>FastSlides sample</Kicker>
+    </Area>
 
-# Tauri Is Awesome
+    <Area x={2} y={4} w={28} h={5}>
+      <Takeaway>Tauri gives web teams native reach without carrying a full Chromium-sized payload.</Takeaway>
+    </Area>
 
-<div className="flex flex-col h-full justify-center">
-  <div className="text-6xl font-extrabold text-neutral-900 mb-6">Small binaries, native power</div>
-  <div className="text-2xl text-neutral-500">FastSlides desktop demo</div>
-</div>
+    <Area x={2} y={10} w={18} h={3}>
+      <p>FastSlides uses the same shape: Rust owns the critical logic, while the web UI stays productive and lightweight.</p>
+    </Area>
 
+    <Area x={2} y={16} w={20} h={2}>
+      <PillRow>
+        <Pill>small install size</Pill>
+        <Pill>native integration</Pill>
+        <Pill>explicit IPC</Pill>
+      </PillRow>
+    </Area>
+
+    <Area x={34} y={5} w={14} h={12}>
+      <Callout title="Why it matters" tone="accent">
+        The product can keep a Rust core for files, rendering, and export while still moving fast on the workspace UI.
+      </Callout>
+    </Area>
+
+    <Area x={34} y={19} w={14} h={2}>
+      <Caption>Desktop app + hook API + embedded MCP server.</Caption>
+    </Area>
+  </Canvas>
 </section>
 
 <section className="slide">
+  <Canvas cols={50} rows={25} gap="1px">
+    <Area x={2} y={2} w={16} h={1}>
+      <Kicker>Why teams pick it</Kicker>
+    </Area>
 
-# Why teams pick Tauri
+    <Area x={2} y={4} w={30} h={4}>
+      <Takeaway>Tauri works when you want native behavior, smaller binaries, and a clear security boundary.</Takeaway>
+    </Area>
 
-<div className="split">
-  <div className="col prose-compact">
+    <Area x={2} y={10} w={14} h={11}>
+      <Panel title="Runtime footprint" tone="accent">
+        <ul>
+          <li>No bundled Chromium requirement.</li>
+          <li>Faster startup and lower memory pressure.</li>
+          <li>A better fit for focused utilities.</li>
+        </ul>
+      </Panel>
+    </Area>
 
-  - Tiny install size and fast startup.
-  - Native OS integration without shipping Chromium.
-  - Great fit for utilities, internal tools, and agent workflows.
+    <Area x={18} y={10} w={14} h={11}>
+      <Panel title="Boundary design">
+        <ul>
+          <li>Rust handles filesystem and OS access.</li>
+          <li>IPC keeps privileged operations explicit.</li>
+          <li>Critical paths are easier to audit.</li>
+        </ul>
+      </Panel>
+    </Area>
 
-  </div>
-  <div className="col prose-compact">
-
-  ## Stack
-
-  - Rust backend commands
-  - Web UI (React/Next/Svelte/etc.)
-  - One codebase, native desktop behaviors
-
-  </div>
-</div>
-
+    <Area x={34} y={10} w={14} h={11}>
+      <Panel title="FastSlides fit">
+        <ul>
+          <li>Hook server and MCP live in Rust.</li>
+          <li>Next drives the workspace shell.</li>
+          <li>Preview and export can converge on one engine.</li>
+        </ul>
+      </Panel>
+    </Area>
+  </Canvas>
 </section>
 
 <section className="slide">
+  <Canvas cols={50} rows={25} gap="1px">
+    <Area x={2} y={2} w={17} h={1}>
+      <Kicker>Architecture</Kicker>
+    </Area>
 
-# Architecture in one minute
+    <Area x={2} y={4} w={31} h={4}>
+      <Takeaway>The strongest pattern is a web workspace around a Rust core, not a web app pretending to be the engine.</Takeaway>
+    </Area>
 
-<div className="split">
-  <div className="col prose-compact">
+    <Area x={2} y={10} w={16} h={11}>
+      <Panel title="UI shell" tone="accent">
+        <ul>
+          <li>Project list and settings.</li>
+          <li>Review controls and approvals.</li>
+          <li>Authoring, inspection, and diffs.</li>
+        </ul>
+      </Panel>
+    </Area>
 
-  1. UI renders in a lightweight webview.
-  2. Secure Rust commands handle filesystem + OS features.
-  3. IPC keeps the boundary explicit and auditable.
+    <Area x={20} y={10} w={12} h={5}>
+      <Metric label="Desktop core" value="Rust" hint="Files, hooks, scene compile, export" />
+    </Area>
 
-  </div>
-  <div className="col prose-compact">
+    <Area x={20} y={16} w={12} h={5}>
+      <Metric label="Workspace shell" value="Next.js" hint="Editor chrome and interaction" />
+    </Area>
 
-  ## What this gives you
-
-  - Better performance profile
-  - Lower memory footprint
-  - Easier hardening of critical paths
-
-  </div>
-</div>
-
+    <Area x={35} y={10} w={13} h={11}>
+      <Callout title="FastSlides direction">
+        The slide renderer should move to the Rust-owned scene model so preview and export stop disagreeing.
+      </Callout>
+    </Area>
+  </Canvas>
 </section>
 
 <section className="slide">
+  <Canvas cols={50} rows={25} gap="1px">
+    <Area x={2} y={2} w={18} h={1}>
+      <Kicker>FastSlides use case</Kicker>
+    </Area>
 
-# FastSlides desktop use case
+    <Area x={2} y={4} w={31} h={4}>
+      <Takeaway>Tauri is a good substrate for an agent-first presentation tool because local workflow matters more than cloud ceremony.</Takeaway>
+    </Area>
 
-<div className="split">
-  <div className="col prose-compact">
+    <Area x={2} y={10} w={16} h={11}>
+      <Panel title="Workflow">
+        <ul>
+          <li>Open a folder with `page.mdx`.</li>
+          <li>Render the selected deck locally.</li>
+          <li>Validate, inspect, and iterate with agents.</li>
+        </ul>
+      </Panel>
+    </Area>
 
-  - Open any folder containing `page.mdx`.
-  - Track projects in-app.
-  - Resize and collapse sidebar for focus.
-  - Render live slide preview inside desktop UI.
+    <Area x={20} y={10} w={12} h={11}>
+      <Panel title="Agent surface" tone="accent">
+        <ul>
+          <li>`open_project`</li>
+          <li>`analyze_project`</li>
+          <li>`compile_project_scene`</li>
+          <li>`preview_url`</li>
+        </ul>
+      </Panel>
+    </Area>
 
-  </div>
-  <div className="col prose-compact">
-
-  ## Agent-ready workflow
-
-  - Local FastSlides hook API for app state + preview URL.
-  - Agent edits MDX, then validates and previews.
-  - Screenshot QA loop for fast visual iteration.
-
-  ![FastSlides logo from project assets](/assets/fastslides-logo.png)
-
-  </div>
-</div>
-
+    <Area x={35} y={10} w={13} h={11}>
+      <Panel title="Project asset">
+        ![FastSlides logo from project assets](/assets/fastslides-logo.png)
+      </Panel>
+    </Area>
+  </Canvas>
 </section>
 
 <section className="slide">
+  <Canvas cols={50} rows={25} gap="1px">
+    <Area x={2} y={2} w={16} h={1}>
+      <Kicker>Takeaway</Kicker>
+    </Area>
 
-# Demo flow
+    <Area x={2} y={4} w={31} h={4}>
+      <Takeaway>Tauri makes the product architecture coherent: Rust for the stage, web tech for the control room.</Takeaway>
+    </Area>
 
-<div className="prose-compact">
+    <Area x={2} y={10} w={18} h={11}>
+      <Panel title="Typical demo flow" tone="accent">
+        <ol>
+          <li>Open a project folder.</li>
+          <li>Validate structure and assets.</li>
+          <li>Render preview and inspect screenshots.</li>
+          <li>Patch source or theme tokens.</li>
+        </ol>
+      </Panel>
+    </Area>
 
-1. Initialize project with `init_deck_project.sh`.
-2. Start preview service.
-3. Launch FastSlides desktop app.
-4. Open project and render preview.
-5. Iterate with agent + screenshots until polished.
+    <Area x={22} y={10} w={10} h={5}>
+      <Metric label="Hook API" value="Localhost" hint="Fast agent loop" />
+    </Area>
 
-</div>
+    <Area x={22} y={16} w={10} h={5}>
+      <Metric label="Renderer path" value="Scene graph" hint="Shared preview and export truth" />
+    </Area>
 
-</section>
-
-<section className="slide">
-
-# Takeaway
-
-<div className="flex flex-col h-full justify-center">
-  <div className="text-5xl font-bold text-neutral-900 mb-6">Tauri gives web teams native reach with fewer tradeoffs.</div>
-  <div className="text-2xl text-neutral-500">FastSlides shows the pattern: Rust core + web UI + agent hooks.</div>
-</div>
-
+    <Area x={35} y={10} w={13} h={11}>
+      <Callout title="Decision">
+        Keep the desktop shell, but stop treating DOM and ad hoc MDX layout as the rendering truth.
+      </Callout>
+    </Area>
+  </Canvas>
 </section>
 
 </main>
