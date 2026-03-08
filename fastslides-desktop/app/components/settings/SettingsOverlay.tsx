@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Moon, Sun } from "@solar-icons/react";
 
 type SlideTokenValues = {
@@ -133,9 +133,14 @@ function formatFamilyLabel(family: string): string {
     .join(" ");
 }
 
-function extractTagContent(source: string | null | undefined, tag: string): string {
+function extractTagContent(
+  source: string | null | undefined,
+  tag: string,
+): string {
   if (!source) return "";
-  const match = source.match(new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"));
+  const match = source.match(
+    new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i"),
+  );
   return match?.[1]?.replace(/\s+/g, " ").trim() ?? "";
 }
 
@@ -215,7 +220,10 @@ function trendGeometry(series: Array<{ ratio: number }>) {
     };
   });
   const linePath = points
-    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`)
+    .map(
+      (point, index) =>
+        `${index === 0 ? "M" : "L"} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`,
+    )
     .join(" ");
   const firstPoint = points[0] ?? { x: 8, y: 52 };
   const lastPoint = points.at(-1) ?? { x: 92, y: 18 };
@@ -231,7 +239,7 @@ function FigureBarPreview({
   data,
   suffix,
 }: {
-  title: string;
+  title?: string;
   data: Array<{ label: string; value: string }>;
   suffix: string;
 }) {
@@ -242,13 +250,6 @@ function FigureBarPreview({
   ]);
   return (
     <section className="library-figure-shell">
-      <div className="library-figure-head">
-        <div>
-          <div className="library-figure-kicker">Figure</div>
-          <div className="library-figure-title">{title || "Exhibit"}</div>
-        </div>
-        <div className="library-figure-meta">Bar chart</div>
-      </div>
       <div className="library-plot-card">
         <div className="library-plot-grid" aria-hidden="true">
           <span />
@@ -270,6 +271,7 @@ function FigureBarPreview({
           ))}
         </div>
       </div>
+      {title ? <div className="mdx-caption">{title}</div> : null}
     </section>
   );
 }
@@ -279,7 +281,7 @@ function FigureTrendPreview({
   data,
   suffix,
 }: {
-  title: string;
+  title?: string;
   data: Array<{ label: string; value: string }>;
   suffix: string;
 }) {
@@ -292,20 +294,18 @@ function FigureTrendPreview({
   const { points, linePath, areaPath } = trendGeometry(safeData);
   return (
     <section className="library-figure-shell">
-      <div className="library-figure-head">
-        <div>
-          <div className="library-figure-kicker">Figure</div>
-          <div className="library-figure-title">{title || "Exhibit"}</div>
-        </div>
-        <div className="library-figure-meta">Trend chart</div>
-      </div>
       <div className="library-plot-card library-plot-card--trend">
         <div className="library-plot-grid" aria-hidden="true">
           <span />
           <span />
           <span />
         </div>
-        <svg className="library-trend-svg" viewBox="0 0 100 64" preserveAspectRatio="none" aria-hidden="true">
+        <svg
+          className="library-trend-svg"
+          viewBox="0 0 100 64"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
           <path d={areaPath} className="library-trend-area" />
           <path d={linePath} className="library-trend-line" />
           {points.map((point, index) => (
@@ -327,24 +327,14 @@ function FigureTrendPreview({
           ))}
         </div>
       </div>
+      {title ? <div className="mdx-caption">{title}</div> : null}
     </section>
   );
 }
 
-function FigureExhibitPanel({
-  title,
-}: {
-  title: string;
-}) {
+function FigureExhibitPanel({ title }: { title?: string }) {
   return (
     <section className="library-figure-shell">
-      <div className="library-figure-head">
-        <div>
-          <div className="library-figure-kicker">Exhibit</div>
-          <div className="library-figure-title">{title || "Evidence"}</div>
-        </div>
-        <div className="library-figure-meta">Table exhibit</div>
-      </div>
       <div className="library-exhibit-card">
         <div className="library-exhibit-summary">
           <strong>2.4x</strong>
@@ -367,6 +357,7 @@ function FigureExhibitPanel({
           </div>
         ))}
       </div>
+      {title ? <div className="mdx-caption">{title}</div> : null}
     </section>
   );
 }
@@ -376,22 +367,27 @@ function InsightRail({
   body,
   tone,
 }: {
-  title: string;
+  title?: string;
   body: string;
   tone: string;
 }) {
   return (
-    <aside className={`mdx-callout mdx-callout--${tone || "accent"} library-insight-rail`} data-variant="rail">
-      <div className="mdx-callout-title">{title}</div>
+    <aside
+      className={`mdx-callout mdx-callout--${tone || "accent"} library-insight-rail`}
+      data-variant="rail"
+    >
+      {title ? <div className="mdx-callout-title">{title}</div> : null}
       <div className="mdx-callout-body">{body}</div>
     </aside>
   );
 }
 
 function LibraryPreview({
+  theme,
   entry,
   template,
 }: {
+  theme: "dark" | "light";
   entry: ComponentCatalogEntry;
   template: DesignTemplate | null;
 }) {
@@ -410,438 +406,487 @@ function LibraryPreview({
   const chartData = parseChartData(extractAttribute(source, "Chart", "data"));
   const chartSuffix = extractAttribute(source, "Chart", "suffix");
   const arrowLabel = extractAttribute(source, "Arrow", "label");
-  const arrowDirection = extractAttribute(source, "Arrow", "direction") || "right";
+  const arrowDirection =
+    extractAttribute(source, "Arrow", "direction") || "right";
   const arrowTone = extractAttribute(source, "Arrow", "tone") || "accent";
-  const metrics = extractAllAttributes(source, "Metric", ["label", "value", "hint"]);
+  const metrics = extractAllAttributes(source, "Metric", [
+    "label",
+    "value",
+    "hint",
+  ]);
   const panels = extractAllAttributes(source, "Panel", ["title", "tone"]);
 
-  if (name === "kicker") {
+  function renderPreview(children: ReactNode, stageClassName?: string) {
     return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          <div className="mdx-kicker">{kicker || "Section label"}</div>
+      <div className="library-preview-frame" data-theme={theme}>
+        <div className="embedded-preview-deck embedded-preview-single">
+          <div className="deck">
+            <section
+              className="slide slide-ready"
+              data-active="true"
+              data-slide-index={0}
+              data-slide-status="ready"
+              aria-label={`${entry.name} preview`}
+            >
+              <div
+                className={["library-preview-stage", stageClassName]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                {children}
+              </div>
+            </section>
+          </div>
         </div>
       </div>
+    );
+  }
+
+  if (name === "kicker") {
+    return renderPreview(
+      <div className="mdx-kicker">{kicker || "Section label"}</div>,
     );
   }
 
   if (name === "takeaway") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          <h2 className="mdx-takeaway" data-scale="compact">
-            {takeaway || "Replace this with the single conclusion for the slide."}
-          </h2>
-        </div>
-      </div>
+    return renderPreview(
+      <h2 className="mdx-takeaway" data-scale="compact">
+        {takeaway || "Replace this with the single conclusion for the slide."}
+      </h2>,
     );
   }
 
   if (name === "caption") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          <div className="mdx-caption">{caption || "Source or operator note"}</div>
-        </div>
-      </div>
+    return renderPreview(
+      <div className="mdx-caption">{caption || "Source or operator note"}</div>,
     );
   }
 
   if (name === "callout") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage library-preview-stage--rail">
-          <aside
-            className={`mdx-callout mdx-callout--${calloutTone}`}
-            data-variant="rail"
-          >
-            <div className="mdx-callout-title">{calloutTitle || "Interpretation"}</div>
-            <div className="mdx-callout-body">
-              {calloutBody || "Explain why the evidence matters."}
-            </div>
-          </aside>
+    return renderPreview(
+      <aside
+        className={`mdx-callout mdx-callout--${calloutTone}`}
+        data-variant="rail"
+      >
+        {calloutTitle ? (
+          <div className="mdx-callout-title">{calloutTitle}</div>
+        ) : null}
+        <div className="mdx-callout-body">
+          {calloutBody || "Explain why the evidence matters."}
         </div>
-      </div>
+      </aside>,
+      "library-preview-stage--rail",
     );
   }
 
   if (name === "panel") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          <section className={`mdx-panel mdx-panel--${panelTone}`} data-variant="compact">
-            <div className="mdx-panel-head">
-              <h3 className="mdx-panel-title">{panelTitle || "Evidence"}</h3>
-            </div>
-            <div className="mdx-panel-body">
-              <p>{panelBody || "Replace with one structured block of evidence."}</p>
-            </div>
-          </section>
+    return renderPreview(
+      <section
+        className={`mdx-panel mdx-panel--${panelTone}`}
+        data-variant="compact"
+      >
+        <div className="mdx-panel-head">
+          <h3 className="mdx-panel-title">{panelTitle || "Evidence"}</h3>
         </div>
-      </div>
+        <div className="mdx-panel-body">
+          <p>{panelBody || "Replace with one structured block of evidence."}</p>
+        </div>
+      </section>,
     );
   }
 
   if (name === "metric") {
     const metric = metrics[0] ?? {};
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          <article className="mdx-metric" data-variant="compact">
-            <p className="mdx-caption mdx-metric-label">{metric.label || "Metric"}</p>
-            <p className="mdx-metric-value">{metric.value || "42%"}</p>
-            <p className="mdx-caption mdx-metric-hint">{metric.hint || "Short note"}</p>
-          </article>
-        </div>
-      </div>
+    return renderPreview(
+      <article className="mdx-metric" data-variant="compact">
+        <p className="mdx-caption mdx-metric-label">
+          {metric.label || "Metric"}
+        </p>
+        <p className="mdx-metric-value">{metric.value || "42%"}</p>
+        <p className="mdx-caption mdx-metric-hint">
+          {metric.hint || "Short note"}
+        </p>
+      </article>,
     );
   }
 
   if (name === "chart") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <FigureBarPreview
-          title={chartTitle || "Exhibit"}
-          data={chartData}
-          suffix={chartSuffix}
-        />
-      </div>
+    return renderPreview(
+      <FigureBarPreview
+        title={chartTitle}
+        data={chartData}
+        suffix={chartSuffix}
+      />,
     );
   }
 
   if (name === "arrow") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          <div className="library-preview-arrow-row">
-            <div className="mdx-arrow" data-direction={arrowDirection} data-tone={arrowTone}>
-              <span className="mdx-arrow-label">{arrowLabel || "Flow of work"}</span>
-              <span className="mdx-arrow-line" />
-              <span className="mdx-arrow-head" />
-            </div>
-          </div>
+    return renderPreview(
+      <div className="library-preview-arrow-row">
+        <div
+          className="mdx-arrow"
+          data-direction={arrowDirection}
+          data-tone={arrowTone}
+        >
+          <span className="mdx-arrow-label">
+            {arrowLabel || "Flow of work"}
+          </span>
+          <span className="mdx-arrow-line" />
+          <span className="mdx-arrow-head" />
         </div>
-      </div>
+      </div>,
     );
   }
 
   if (name === "rule") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          <div className="mdx-rule" />
-        </div>
-      </div>
-    );
+    return renderPreview(<div className="mdx-rule" />);
   }
 
   if (name === "takeawayrail") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          <div className="mdx-kicker">{kicker || "Section"}</div>
-          <h2 className="mdx-takeaway" data-scale="compact">
-            {takeaway || "Replace this with the main conclusion for the slide."}
-          </h2>
-          <div className="library-preview-grid library-preview-grid--recipe">
-            <div />
-            <aside className={`mdx-callout mdx-callout--${calloutTone}`} data-variant="rail">
-              <div className="mdx-callout-title">{calloutTitle || "Interpretation"}</div>
-              <div className="mdx-callout-body">
-                {calloutBody || "Explain why the takeaway matters in one short paragraph."}
-              </div>
-            </aside>
-          </div>
-          {caption ? <div className="mdx-caption">{caption}</div> : null}
+    return renderPreview(
+      <>
+        <div className="mdx-kicker">{kicker || "Section"}</div>
+        <h2 className="mdx-takeaway" data-scale="compact">
+          {takeaway || "Replace this with the main conclusion for the slide."}
+        </h2>
+        <div className="library-preview-grid library-preview-grid--recipe">
+          <div />
+          <aside
+            className={`mdx-callout mdx-callout--${calloutTone}`}
+            data-variant="rail"
+          >
+            {calloutTitle ? (
+              <div className="mdx-callout-title">{calloutTitle}</div>
+            ) : null}
+            <div className="mdx-callout-body">
+              {calloutBody ||
+                "Explain why the takeaway matters in one short paragraph."}
+            </div>
+          </aside>
         </div>
-      </div>
+        {caption ? <div className="mdx-caption">{caption}</div> : null}
+      </>,
     );
   }
 
   if (name === "takeaway_plus_rail") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
-          <h2 className="mdx-takeaway" data-scale="compact">
-            {takeaway || "Replace this with the main conclusion for the slide."}
-          </h2>
-          <div className="library-preview-grid library-preview-grid--recipe">
-            <div />
-            <aside className={`mdx-callout mdx-callout--${calloutTone}`} data-variant="rail">
-              <div className="mdx-callout-title">{calloutTitle || "Interpretation"}</div>
-              <div className="mdx-callout-body">
-                {calloutBody || "Explain why the takeaway matters in one short paragraph."}
-              </div>
-            </aside>
-          </div>
-          {caption ? <div className="mdx-caption">{caption}</div> : null}
+    return renderPreview(
+      <>
+        {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
+        <h2 className="mdx-takeaway" data-scale="compact">
+          {takeaway || "Replace this with the main conclusion for the slide."}
+        </h2>
+        <div className="library-preview-grid library-preview-grid--recipe">
+          <div />
+          <aside
+            className={`mdx-callout mdx-callout--${calloutTone}`}
+            data-variant="rail"
+          >
+            {calloutTitle ? (
+              <div className="mdx-callout-title">{calloutTitle}</div>
+            ) : null}
+            <div className="mdx-callout-body">
+              {calloutBody ||
+                "Explain why the takeaway matters in one short paragraph."}
+            </div>
+          </aside>
         </div>
-      </div>
+        {caption ? <div className="mdx-caption">{caption}</div> : null}
+      </>,
     );
   }
 
   if (name === "metricstrip" || name === "kpipair") {
-    const previewMetrics = metrics.length ? metrics : [
-      { label: "Metric A", value: "12%", hint: "Short supporting note" },
-      { label: "Metric B", value: "3.4x", hint: "Short supporting note" },
-      { label: "Metric C", value: "24d", hint: "Short supporting note" },
-    ];
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className={`library-preview-grid ${name === "kpipair" ? "library-preview-grid--recipe" : "library-preview-grid--three"}`}>
-          <div className={name === "kpipair" ? "library-preview-grid library-preview-grid--two library-preview-stack" : "library-preview-grid library-preview-grid--three"}>
-            {previewMetrics.slice(0, name === "kpipair" ? 2 : 3).map((metric) => (
-              <article key={`${metric.label}-${metric.value}`} className="mdx-metric" data-variant="compact">
+    const previewMetrics = metrics.length
+      ? metrics
+      : [
+          { label: "Metric A", value: "12%", hint: "Short supporting note" },
+          { label: "Metric B", value: "3.4x", hint: "Short supporting note" },
+          { label: "Metric C", value: "24d", hint: "Short supporting note" },
+        ];
+    return renderPreview(
+      <div
+        className={`library-preview-grid ${name === "kpipair" ? "library-preview-grid--recipe" : "library-preview-grid--three"}`}
+      >
+        <div
+          className={
+            name === "kpipair"
+              ? "library-preview-grid library-preview-grid--two library-preview-stack"
+              : "library-preview-grid library-preview-grid--three"
+          }
+        >
+          {previewMetrics.slice(0, name === "kpipair" ? 2 : 3).map((metric) => (
+            <article
+              key={`${metric.label}-${metric.value}`}
+              className="mdx-metric"
+              data-variant="compact"
+            >
+              <p className="mdx-caption mdx-metric-label">{metric.label}</p>
+              <p className="mdx-metric-value">{metric.value}</p>
+              <p className="mdx-caption mdx-metric-hint">{metric.hint}</p>
+            </article>
+          ))}
+        </div>
+        {name === "kpipair" ? (
+          <aside
+            className={`mdx-callout mdx-callout--${calloutTone || "default"}`}
+            data-variant="rail"
+          >
+            {calloutTitle ? (
+              <div className="mdx-callout-title">{calloutTitle}</div>
+            ) : null}
+            <div className="mdx-callout-body">
+              {calloutBody || "Add the interpretation implied by the two KPIs."}
+            </div>
+          </aside>
+        ) : null}
+      </div>,
+    );
+  }
+
+  if (
+    name === "exhibitcommentary" ||
+    name === "exhibit_left_commentary_right"
+  ) {
+    return renderPreview(
+      <>
+        {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
+        {takeaway ? (
+          <h2 className="mdx-takeaway" data-scale="compact">
+            {takeaway}
+          </h2>
+        ) : null}
+        <div className="library-preview-grid library-preview-grid--recipe">
+          <FigureExhibitPanel title={chartTitle || panelTitle} />
+          <InsightRail
+            title={calloutTitle}
+            body={
+              calloutBody ||
+              "Explain the one thing the audience should take away from the exhibit."
+            }
+            tone={calloutTone || "default"}
+          />
+        </div>
+        {caption ? <div className="mdx-caption">{caption}</div> : null}
+      </>,
+    );
+  }
+
+  if (name === "scorecard_with_note") {
+    const previewMetrics = metrics.length
+      ? metrics
+      : [
+          { label: "Metric A", value: "12%", hint: "Short note" },
+          { label: "Metric B", value: "3.4x", hint: "Short note" },
+          { label: "Metric C", value: "24d", hint: "Short note" },
+        ];
+    return renderPreview(
+      <>
+        {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
+        {takeaway ? (
+          <h2 className="mdx-takeaway" data-scale="compact">
+            {takeaway}
+          </h2>
+        ) : null}
+        <div className="library-preview-grid library-preview-grid--recipe">
+          <div className="library-preview-grid library-preview-grid--three">
+            {previewMetrics.slice(0, 3).map((metric) => (
+              <article
+                key={`${metric.label}-${metric.value}`}
+                className="mdx-metric"
+                data-variant="compact"
+              >
                 <p className="mdx-caption mdx-metric-label">{metric.label}</p>
                 <p className="mdx-metric-value">{metric.value}</p>
                 <p className="mdx-caption mdx-metric-hint">{metric.hint}</p>
               </article>
             ))}
           </div>
-          {name === "kpipair" ? (
-            <aside className={`mdx-callout mdx-callout--${calloutTone || "default"}`} data-variant="rail">
-              <div className="mdx-callout-title">{calloutTitle || "Operator note"}</div>
-              <div className="mdx-callout-body">{calloutBody || "Add the interpretation implied by the two KPIs."}</div>
-            </aside>
-          ) : null}
-        </div>
-      </div>
-    );
-  }
-
-  if (name === "exhibitcommentary" || name === "exhibit_left_commentary_right") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
-          {takeaway ? (
-            <h2 className="mdx-takeaway" data-scale="compact">
-              {takeaway}
-            </h2>
-          ) : null}
-          <div className="library-preview-grid library-preview-grid--recipe">
-            <FigureExhibitPanel title={chartTitle || panelTitle || "Exhibit"} />
-            <InsightRail
-              title={calloutTitle || "Interpretation"}
-              body={
-                calloutBody ||
-                "Explain the one thing the audience should take away from the exhibit."
-              }
-              tone={calloutTone || "default"}
-            />
-          </div>
-          {caption ? <div className="mdx-caption">{caption}</div> : null}
-        </div>
-      </div>
-    );
-  }
-
-  if (name === "scorecard_with_note") {
-    const previewMetrics = metrics.length ? metrics : [
-      { label: "Metric A", value: "12%", hint: "Short note" },
-      { label: "Metric B", value: "3.4x", hint: "Short note" },
-      { label: "Metric C", value: "24d", hint: "Short note" },
-    ];
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
-          {takeaway ? (
-            <h2 className="mdx-takeaway" data-scale="compact">
-              {takeaway}
-            </h2>
-          ) : null}
-          <div className="library-preview-grid library-preview-grid--recipe">
-            <div className="library-preview-grid library-preview-grid--three">
-              {previewMetrics.slice(0, 3).map((metric) => (
-                <article key={`${metric.label}-${metric.value}`} className="mdx-metric" data-variant="compact">
-                  <p className="mdx-caption mdx-metric-label">{metric.label}</p>
-                  <p className="mdx-metric-value">{metric.value}</p>
-                  <p className="mdx-caption mdx-metric-hint">{metric.hint}</p>
-                </article>
-              ))}
+          <aside
+            className={`mdx-callout mdx-callout--${calloutTone}`}
+            data-variant="rail"
+          >
+            {calloutTitle ? (
+              <div className="mdx-callout-title">{calloutTitle}</div>
+            ) : null}
+            <div className="mdx-callout-body">
+              {calloutBody || "Explain the scorecard in one sentence."}
             </div>
-            <aside className={`mdx-callout mdx-callout--${calloutTone}`} data-variant="rail">
-              <div className="mdx-callout-title">{calloutTitle || "Interpretation"}</div>
-              <div className="mdx-callout-body">{calloutBody || "Explain the scorecard in one sentence."}</div>
-            </aside>
-          </div>
-          {caption ? <div className="mdx-caption">{caption}</div> : null}
+          </aside>
         </div>
-      </div>
+        {caption ? <div className="mdx-caption">{caption}</div> : null}
+      </>,
     );
   }
 
   if (name === "threeuppanels" || name === "three_up_compare") {
-    const previewPanels = panels.length ? panels : [
-      { title: "Column one", tone: "accent" },
-      { title: "Column two", tone: "default" },
-      { title: "Column three", tone: "default" },
-    ];
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
-          {takeaway ? (
-            <h2 className="mdx-takeaway" data-scale="compact">
-              {takeaway}
-            </h2>
-          ) : null}
-          <div className="library-preview-grid library-preview-grid--three">
-            {previewPanels.slice(0, 3).map((panel, index) => (
-              <section
-                key={`${panel.title}-${index}`}
-                className={`mdx-panel ${panel.tone && panel.tone !== "default" ? `mdx-panel--${panel.tone}` : ""}`.trim()}
-                data-variant="compact"
-              >
-                <div className="mdx-panel-head">
-                  <h3 className="mdx-panel-title">{panel.title || `Column ${index + 1}`}</h3>
-                </div>
-                <div className="mdx-panel-body">
-                  <p>Replace with the {index === 0 ? "first" : index === 1 ? "second" : "third"} parallel point.</p>
-                </div>
-              </section>
-            ))}
-          </div>
+    const previewPanels = panels.length
+      ? panels
+      : [
+          { title: "Column one", tone: "accent" },
+          { title: "Column two", tone: "default" },
+          { title: "Column three", tone: "default" },
+        ];
+    return renderPreview(
+      <>
+        {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
+        {takeaway ? (
+          <h2 className="mdx-takeaway" data-scale="compact">
+            {takeaway}
+          </h2>
+        ) : null}
+        <div className="library-preview-grid library-preview-grid--three">
+          {previewPanels.slice(0, 3).map((panel, index) => (
+            <section
+              key={`${panel.title}-${index}`}
+              className={`mdx-panel ${panel.tone && panel.tone !== "default" ? `mdx-panel--${panel.tone}` : ""}`.trim()}
+              data-variant="compact"
+            >
+              <div className="mdx-panel-head">
+                <h3 className="mdx-panel-title">
+                  {panel.title || `Column ${index + 1}`}
+                </h3>
+              </div>
+              <div className="mdx-panel-body">
+                <p>
+                  Replace with the{" "}
+                  {index === 0 ? "first" : index === 1 ? "second" : "third"}{" "}
+                  parallel point.
+                </p>
+              </div>
+            </section>
+          ))}
         </div>
-      </div>
+      </>,
     );
   }
 
   if (name === "kpi_pair_with_exhibit") {
-    const previewMetrics = metrics.length ? metrics : [
-      { label: "KPI one", value: "42%", hint: "Short note" },
-      { label: "KPI two", value: "18d", hint: "Short note" },
-    ];
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
-          {takeaway ? (
-            <h2 className="mdx-takeaway" data-scale="compact">
-              {takeaway}
-            </h2>
-          ) : null}
-          <div className="library-preview-grid library-preview-grid--recipe">
-            <FigureBarPreview
-              title={chartTitle || "Supporting exhibit"}
-              data={chartData.length ? chartData : [
-                { label: "Segment A", value: "47" },
-                { label: "Segment B", value: "38" },
-                { label: "Segment C", value: "29" },
-              ]}
-              suffix={chartSuffix}
-            />
-            <div className="library-preview-grid library-preview-grid--two library-preview-stack">
-              {previewMetrics.slice(0, 2).map((metric) => (
-                <article key={`${metric.label}-${metric.value}`} className="mdx-metric" data-variant="compact">
-                  <p className="mdx-caption mdx-metric-label">{metric.label}</p>
-                  <p className="mdx-metric-value">{metric.value}</p>
-                  <p className="mdx-caption mdx-metric-hint">{metric.hint}</p>
-                </article>
-              ))}
-            </div>
+    const previewMetrics = metrics.length
+      ? metrics
+      : [
+          { label: "KPI one", value: "42%", hint: "Short note" },
+          { label: "KPI two", value: "18d", hint: "Short note" },
+        ];
+    return renderPreview(
+      <>
+        {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
+        {takeaway ? (
+          <h2 className="mdx-takeaway" data-scale="compact">
+            {takeaway}
+          </h2>
+        ) : null}
+        <div className="library-preview-grid library-preview-grid--recipe">
+          <FigureBarPreview
+            title={chartTitle}
+            data={
+              chartData.length
+                ? chartData
+                : [
+                    { label: "Segment A", value: "47" },
+                    { label: "Segment B", value: "38" },
+                    { label: "Segment C", value: "29" },
+                  ]
+            }
+            suffix={chartSuffix}
+          />
+          <div className="library-preview-grid library-preview-grid--two library-preview-stack">
+            {previewMetrics.slice(0, 2).map((metric) => (
+              <article
+                key={`${metric.label}-${metric.value}`}
+                className="mdx-metric"
+                data-variant="compact"
+              >
+                <p className="mdx-caption mdx-metric-label">{metric.label}</p>
+                <p className="mdx-metric-value">{metric.value}</p>
+                <p className="mdx-caption mdx-metric-hint">{metric.hint}</p>
+              </article>
+            ))}
           </div>
         </div>
-      </div>
+      </>,
     );
   }
 
   if (name === "imagefigure") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          <section className="mdx-panel" data-variant="compact">
-            <div className="mdx-panel-head">
-              <div className="mdx-kicker">Figure</div>
-              <h3 className="mdx-panel-title">Key visual</h3>
-            </div>
-            <div className="mdx-panel-body">
-              <div className="library-preview-media-frame" />
-            </div>
-            <div className="mdx-panel-foot">Short caption or explanatory note.</div>
-          </section>
+    return renderPreview(
+      <section className="mdx-panel" data-variant="compact">
+        <div className="mdx-panel-head">
+          <h3 className="mdx-panel-title">Key visual</h3>
         </div>
-      </div>
+        <div className="mdx-panel-body">
+          <div className="library-preview-media-frame" />
+        </div>
+        <div className="mdx-panel-foot">Short caption or explanatory note.</div>
+      </section>,
     );
   }
 
   if (name === "logostrip") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          <div className="mdx-pill-row">
-            <span className="mdx-pill">OpenAI</span>
-            <span className="mdx-pill">Anthropic</span>
-            <span className="mdx-pill">Google</span>
-            <span className="mdx-pill">Microsoft</span>
-          </div>
-        </div>
-      </div>
+    return renderPreview(
+      <div className="mdx-pill-row">
+        <span className="mdx-pill">OpenAI</span>
+        <span className="mdx-pill">Anthropic</span>
+        <span className="mdx-pill">Google</span>
+        <span className="mdx-pill">Microsoft</span>
+      </div>,
     );
   }
 
   if (name === "trendchartcommentary" || name === "barchartcommentary") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          <div className="library-preview-grid library-preview-grid--recipe">
-            {name === "trendchartcommentary" ? (
-              <FigureTrendPreview
-                title={chartTitle || "Exhibit"}
-                data={chartData}
-                suffix={chartSuffix}
-              />
-            ) : (
-              <FigureBarPreview
-                title={chartTitle || "Exhibit"}
-                data={chartData}
-                suffix={chartSuffix}
-              />
-            )}
-            <InsightRail
-              title={calloutTitle || "Interpretation"}
-              body={
-                calloutBody ||
-                "Explain the one thing the audience should take away from the exhibit."
-              }
-              tone={calloutTone || "default"}
-            />
-          </div>
-        </div>
-      </div>
+    return renderPreview(
+      <div className="library-preview-grid library-preview-grid--recipe">
+        {name === "trendchartcommentary" ? (
+          <FigureTrendPreview
+            title={chartTitle}
+            data={chartData}
+            suffix={chartSuffix}
+          />
+        ) : (
+          <FigureBarPreview
+            title={chartTitle}
+            data={chartData}
+            suffix={chartSuffix}
+          />
+        )}
+        <InsightRail
+          title={calloutTitle}
+          body={
+            calloutBody ||
+            "Explain the one thing the audience should take away from the exhibit."
+          }
+          tone={calloutTone || "default"}
+        />
+      </div>,
     );
   }
 
   if (name === "arrowbridge") {
-    return (
-      <div className="embedded-preview-deck library-preview-surface">
-        <div className="library-preview-stage">
-          <div className="library-preview-arrow-row">
-            <div className="mdx-arrow" data-direction={arrowDirection || "right"} data-tone={arrowTone || "accent"}>
-              <span className="mdx-arrow-label">{arrowLabel || "Connect the modules"}</span>
-              <span className="mdx-arrow-line" />
-              <span className="mdx-arrow-head" />
-            </div>
-          </div>
+    return renderPreview(
+      <div className="library-preview-arrow-row">
+        <div
+          className="mdx-arrow"
+          data-direction={arrowDirection || "right"}
+          data-tone={arrowTone || "accent"}
+        >
+          <span className="mdx-arrow-label">
+            {arrowLabel || "Connect the modules"}
+          </span>
+          <span className="mdx-arrow-line" />
+          <span className="mdx-arrow-head" />
         </div>
-      </div>
+      </div>,
     );
   }
 
-  return (
-    <div className="embedded-preview-deck library-preview-surface">
-      <div className="library-preview-stage">
-        <section className="mdx-panel" data-variant="compact">
-          <div className="mdx-panel-head">
-            <div className="mdx-kicker">{formatFamilyLabel(entry.family)}</div>
-            <h3 className="mdx-panel-title">{entry.name}</h3>
-            <p className="mdx-panel-subtitle">{entry.summary}</p>
-          </div>
-        </section>
+  return renderPreview(
+    <section className="mdx-panel" data-variant="compact">
+      <div className="mdx-panel-head">
+        <div className="mdx-kicker">{formatFamilyLabel(entry.family)}</div>
+        <h3 className="mdx-panel-title">{entry.name}</h3>
+        <p className="mdx-panel-subtitle">{entry.summary}</p>
       </div>
-    </div>
+    </section>,
   );
 }
 
@@ -974,7 +1019,9 @@ export function SettingsOverlay({
                     <select
                       className="token-select"
                       value={mermaidThemeName}
-                      onChange={(event) => onMermaidThemeChange(event.target.value)}
+                      onChange={(event) =>
+                        onMermaidThemeChange(event.target.value)
+                      }
                     >
                       {mermaidThemeOptions.map((option) => (
                         <option key={option} value={option}>
@@ -994,7 +1041,9 @@ export function SettingsOverlay({
                     <select
                       className="token-select"
                       value={syntaxThemeName}
-                      onChange={(event) => onSyntaxThemeChange(event.target.value)}
+                      onChange={(event) =>
+                        onSyntaxThemeChange(event.target.value)
+                      }
                     >
                       <optgroup label="Dark">
                         {syntaxThemeOptionsByMode.dark.map((option) => (
@@ -1015,7 +1064,7 @@ export function SettingsOverlay({
                 </div>
               </div>
 
-              {selectedProject && (
+              {selectedProject ? (
                 <>
                   <div className="settings-section">
                     <span className="settings-label">Colors</span>
@@ -1027,13 +1076,17 @@ export function SettingsOverlay({
                             <input
                               type="color"
                               value={hexForInput(slideTokens[key])}
-                              onChange={(event) => onUpdateToken(key, event.target.value)}
+                              onChange={(event) =>
+                                onUpdateToken(key, event.target.value)
+                              }
                             />
                             <input
                               type="text"
                               className="color-text"
                               value={slideTokens[key]}
-                              onChange={(event) => onUpdateToken(key, event.target.value)}
+                              onChange={(event) =>
+                                onUpdateToken(key, event.target.value)
+                              }
                             />
                           </span>
                         </label>
@@ -1049,12 +1102,16 @@ export function SettingsOverlay({
                           <input
                             type="color"
                             value={hexForInput(slideTokens[key])}
-                            onChange={(event) => onUpdateToken(key, event.target.value)}
+                            onChange={(event) =>
+                              onUpdateToken(key, event.target.value)
+                            }
                           />
                           <span
                             className="palette-preview"
                             style={{
-                              background: isHexColor(slideTokens[key]) ? slideTokens[key] : "#888",
+                              background: isHexColor(slideTokens[key])
+                                ? slideTokens[key]
+                                : "#888",
                             }}
                           />
                         </label>
@@ -1070,7 +1127,9 @@ export function SettingsOverlay({
                         <select
                           className="token-select"
                           value={slideTokens.slideFontFamily}
-                          onChange={(event) => onUpdateToken("slideFontFamily", event.target.value)}
+                          onChange={(event) =>
+                            onUpdateToken("slideFontFamily", event.target.value)
+                          }
                         >
                           {fontOptions.map((option) => (
                             <option key={option} value={option}>
@@ -1084,9 +1143,16 @@ export function SettingsOverlay({
                         <select
                           className="token-select"
                           value={slideTokens.slideHeadingFont}
-                          onChange={(event) => onUpdateToken("slideHeadingFont", event.target.value)}
+                          onChange={(event) =>
+                            onUpdateToken(
+                              "slideHeadingFont",
+                              event.target.value,
+                            )
+                          }
                         >
-                          <option value="var(--slide-font-family)">Same as body</option>
+                          <option value="var(--slide-font-family)">
+                            Same as body
+                          </option>
                           {fontOptions.map((option) => (
                             <option key={option} value={option}>
                               {fontLabel(option)}
@@ -1099,7 +1165,9 @@ export function SettingsOverlay({
                         <select
                           className="token-select"
                           value={slideTokens.slideCodeFont}
-                          onChange={(event) => onUpdateToken("slideCodeFont", event.target.value)}
+                          onChange={(event) =>
+                            onUpdateToken("slideCodeFont", event.target.value)
+                          }
                         >
                           {monoFontOptions.map((option) => (
                             <option key={option} value={option}>
@@ -1113,9 +1181,13 @@ export function SettingsOverlay({
                         <select
                           className="token-select"
                           value={slideTokens.slideMetaFont}
-                          onChange={(event) => onUpdateToken("slideMetaFont", event.target.value)}
+                          onChange={(event) =>
+                            onUpdateToken("slideMetaFont", event.target.value)
+                          }
                         >
-                          <option value="var(--slide-code-font)">Same as code</option>
+                          <option value="var(--slide-code-font)">
+                            Same as code
+                          </option>
                           {monoFontOptions.map((option) => (
                             <option key={option} value={option}>
                               {fontLabel(option)}
@@ -1129,7 +1201,9 @@ export function SettingsOverlay({
                           type="text"
                           className="token-input"
                           value={slideTokens.slideMetaSize}
-                          onChange={(event) => onUpdateToken("slideMetaSize", event.target.value)}
+                          onChange={(event) =>
+                            onUpdateToken("slideMetaSize", event.target.value)
+                          }
                         />
                       </label>
                     </div>
@@ -1145,7 +1219,9 @@ export function SettingsOverlay({
                             type="text"
                             className="token-input"
                             value={slideTokens[key]}
-                            onChange={(event) => onUpdateToken(key, event.target.value)}
+                            onChange={(event) =>
+                              onUpdateToken(key, event.target.value)
+                            }
                           />
                         </label>
                       ))}
@@ -1156,7 +1232,8 @@ export function SettingsOverlay({
                     <span className="settings-label">Components</span>
                     <div className="token-grid">
                       {COMPONENT_FIELDS.map(({ key, label }) => {
-                        const isColor = key.endsWith("Bg") || key.endsWith("Border");
+                        const isColor =
+                          key.endsWith("Bg") || key.endsWith("Border");
                         return (
                           <label key={key} className="token-row">
                             <span className="token-name">{label}</span>
@@ -1165,13 +1242,17 @@ export function SettingsOverlay({
                                 <input
                                   type="color"
                                   value={hexForInput(slideTokens[key])}
-                                  onChange={(event) => onUpdateToken(key, event.target.value)}
+                                  onChange={(event) =>
+                                    onUpdateToken(key, event.target.value)
+                                  }
                                 />
                                 <input
                                   type="text"
                                   className="color-text"
                                   value={slideTokens[key]}
-                                  onChange={(event) => onUpdateToken(key, event.target.value)}
+                                  onChange={(event) =>
+                                    onUpdateToken(key, event.target.value)
+                                  }
                                 />
                               </span>
                             ) : (
@@ -1179,7 +1260,9 @@ export function SettingsOverlay({
                                 type="text"
                                 className="token-input"
                                 value={slideTokens[key]}
-                                onChange={(event) => onUpdateToken(key, event.target.value)}
+                                onChange={(event) =>
+                                  onUpdateToken(key, event.target.value)
+                                }
                               />
                             )}
                           </label>
@@ -1197,6 +1280,16 @@ export function SettingsOverlay({
                     Save to slides.css
                   </button>
                 </>
+              ) : (
+                <div className="settings-section">
+                  <span className="settings-label">Project theme</span>
+                  <p className="settings-hint">
+                    Slide tokens like fonts, heading styles, colors, palette,
+                    and component surfaces are project-specific and live in{" "}
+                    <code>slides.css</code>. Open or create a project to edit
+                    them here.
+                  </p>
+                </div>
               )}
             </>
           ) : (
@@ -1205,7 +1298,8 @@ export function SettingsOverlay({
                 <div>
                   <span className="settings-label">Component library</span>
                   <p className="settings-hint">
-                    Query the design system without loading every component into prompt context.
+                    Query the design system without loading every component into
+                    prompt context.
                   </p>
                 </div>
                 <input
@@ -1218,11 +1312,16 @@ export function SettingsOverlay({
               </div>
 
               <div className="library-browser">
-                <section className="library-list-panel" aria-label="Component catalog">
+                <section
+                  className="library-list-panel"
+                  aria-label="Component catalog"
+                >
                   {componentCatalogLoading ? (
                     <p className="settings-hint">Loading component library…</p>
                   ) : componentCatalogError ? (
-                    <p className="library-empty-state">{componentCatalogError}</p>
+                    <p className="library-empty-state">
+                      {componentCatalogError}
+                    </p>
                   ) : groupedCatalog.length === 0 ? (
                     <p className="library-empty-state">
                       {normalizedLibraryQuery
@@ -1234,16 +1333,26 @@ export function SettingsOverlay({
                       <div key={family} className="library-group">
                         <button
                           type="button"
-                          className={`library-group-toggle ${(normalizedLibraryQuery || expandedFamilies[family]) ? "is-expanded" : ""}`}
+                          className={`library-group-toggle ${normalizedLibraryQuery || expandedFamilies[family] ? "is-expanded" : ""}`}
                           onClick={() => toggleLibraryFamily(family)}
-                          aria-expanded={normalizedLibraryQuery ? true : Boolean(expandedFamilies[family])}
+                          aria-expanded={
+                            normalizedLibraryQuery
+                              ? true
+                              : Boolean(expandedFamilies[family])
+                          }
                         >
                           <span className="library-group-head">
-                            <span className="library-group-name">{formatFamilyLabel(family)}</span>
-                            <span className="library-group-count">{entries.length}</span>
+                            <span className="library-group-name">
+                              {formatFamilyLabel(family)}
+                            </span>
+                            <span className="library-group-count">
+                              {entries.length}
+                            </span>
                           </span>
                           <span className="library-group-toggle-text">
-                            {normalizedLibraryQuery || expandedFamilies[family] ? "close" : "open"}
+                            {normalizedLibraryQuery || expandedFamilies[family]
+                              ? "close"
+                              : "open"}
                           </span>
                         </button>
                         {normalizedLibraryQuery || expandedFamilies[family] ? (
@@ -1256,12 +1365,19 @@ export function SettingsOverlay({
                                 onClick={() => onSelectComponent(entry.name)}
                               >
                                 <span className="library-item-row">
-                                  <span className="library-item-name">{entry.name}</span>
-                                  <span className="library-item-kind" data-kind={entry.kind}>
+                                  <span className="library-item-name">
+                                    {entry.name}
+                                  </span>
+                                  <span
+                                    className="library-item-kind"
+                                    data-kind={entry.kind}
+                                  >
                                     {entry.kind}
                                   </span>
                                 </span>
-                                <span className="library-item-summary">{entry.summary}</span>
+                                <span className="library-item-summary">
+                                  {entry.summary}
+                                </span>
                               </button>
                             ))}
                           </div>
@@ -1271,16 +1387,23 @@ export function SettingsOverlay({
                   )}
                 </section>
 
-                <section className="library-detail-panel" aria-label="Selected component details">
+                <section
+                  className="library-detail-panel"
+                  aria-label="Selected component details"
+                >
                   {selectedCatalogEntry ? (
                     <>
                       <div className="library-detail-head">
                         <div>
                           <h3>{selectedCatalogEntry.name}</h3>
-                          <p className="library-detail-summary">{selectedCatalogEntry.summary}</p>
+                          <p className="library-detail-summary">
+                            {selectedCatalogEntry.summary}
+                          </p>
                         </div>
                         <div className="library-chip-row">
-                          <span className="library-chip">{selectedCatalogEntry.family}</span>
+                          <span className="library-chip">
+                            {selectedCatalogEntry.family}
+                          </span>
                           <span
                             className="library-chip"
                             data-chip-role="kind"
@@ -1288,13 +1411,16 @@ export function SettingsOverlay({
                           >
                             {selectedCatalogEntry.kind}
                           </span>
-                          <span className="library-chip">{selectedCatalogEntry.scope}</span>
+                          <span className="library-chip">
+                            {selectedCatalogEntry.scope}
+                          </span>
                         </div>
                       </div>
 
                       <div className="settings-section">
                         <span className="settings-label">Preview</span>
                         <LibraryPreview
+                          theme={theme}
                           entry={selectedCatalogEntry}
                           template={selectedComponentTemplate}
                         />
@@ -1313,13 +1439,21 @@ export function SettingsOverlay({
                       <div className="settings-section">
                         <span className="settings-label">Template</span>
                         {componentTemplateLoading ? (
-                          <p className="settings-hint">Loading canonical template…</p>
+                          <p className="settings-hint">
+                            Loading canonical template…
+                          </p>
                         ) : componentTemplateError ? (
-                          <p className="library-empty-state">{componentTemplateError}</p>
+                          <p className="library-empty-state">
+                            {componentTemplateError}
+                          </p>
                         ) : selectedComponentTemplate ? (
-                          <pre className="library-code">{selectedComponentTemplate.mdx}</pre>
+                          <pre className="library-code">
+                            {selectedComponentTemplate.mdx}
+                          </pre>
                         ) : (
-                          <p className="settings-hint">Select a library entry to inspect it.</p>
+                          <p className="settings-hint">
+                            Select a library entry to inspect it.
+                          </p>
                         )}
                       </div>
 
@@ -1336,7 +1470,8 @@ export function SettingsOverlay({
                     </>
                   ) : (
                     <p className="library-empty-state">
-                      Select a component to inspect its canonical MDX and usage notes.
+                      Select a component to inspect its canonical MDX and usage
+                      notes.
                     </p>
                   )}
                 </section>

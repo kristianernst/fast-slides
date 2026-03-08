@@ -591,7 +591,10 @@ function inferCalloutVariant(
   return "standard";
 }
 
-function inferPanelVariant(scope: LayoutScope, bodyLength: number): PanelVariant {
+function inferPanelVariant(
+  scope: LayoutScope,
+  bodyLength: number,
+): PanelVariant {
   const areaCols = scope.areaCols ?? 18;
   const areaRows = scope.areaRows ?? 11;
   if (areaCols <= 20 || areaRows <= 11 || bodyLength >= 120) {
@@ -867,10 +870,7 @@ function cssLengthValue(
   return undefined;
 }
 
-function formatChartValue(
-  value: number,
-  suffix?: string | null,
-): string {
+function formatChartValue(value: number, suffix?: string | null): string {
   const rounded =
     Math.abs(value % 1) < 0.001
       ? String(Math.round(value))
@@ -884,9 +884,12 @@ function chartColorForTone(
   highlighted: boolean,
 ): string {
   if (highlighted) {
-    if (tone === "success") return "var(--slide-palette-2, var(--slide-accent, #7b9cbc))";
-    if (tone === "warning") return "var(--slide-palette-3, var(--slide-accent, #7b9cbc))";
-    if (tone === "danger") return "var(--slide-palette-4, var(--slide-accent, #7b9cbc))";
+    if (tone === "success")
+      return "var(--slide-palette-2, var(--slide-accent, #7b9cbc))";
+    if (tone === "warning")
+      return "var(--slide-palette-3, var(--slide-accent, #7b9cbc))";
+    if (tone === "danger")
+      return "var(--slide-palette-4, var(--slide-accent, #7b9cbc))";
     return "var(--slide-accent, var(--slide-palette-1, #7b9cbc))";
   }
   const paletteIndex = (index % 5) + 1;
@@ -1110,7 +1113,8 @@ function MdxChart({
 }: MdxChartProps) {
   const layoutScope = useLayoutScope();
   const normalizedTone = normalizeCardTone(tone);
-  const normalizedType = chartType?.trim().toLowerCase() === "trend" ? "trend" : "bar";
+  const normalizedType =
+    chartType?.trim().toLowerCase() === "trend" ? "trend" : "bar";
   const safeData = data.filter(
     (item) =>
       typeof item.label === "string" &&
@@ -1133,7 +1137,7 @@ function MdxChart({
       safeData.length <= 1
         ? (left + right) / 2
         : left + ((right - left) * index) / (safeData.length - 1);
-    const y = bottom - ((item.value / span) * (bottom - top));
+    const y = bottom - (item.value / span) * (bottom - top);
     return { ...item, x, y };
   });
   const trendPath = trendPoints
@@ -1172,10 +1176,7 @@ function MdxChart({
             <line x1="6" y1="29" x2="96" y2="29" className="mdx-chart-grid" />
             <line x1="6" y1="6" x2="96" y2="6" className="mdx-chart-grid" />
             {trendAreaPath ? (
-              <path
-                d={trendAreaPath}
-                className="mdx-chart-area"
-              />
+              <path d={trendAreaPath} className="mdx-chart-area" />
             ) : null}
             {trendPath ? (
               <path
@@ -1187,7 +1188,8 @@ function MdxChart({
               />
             ) : null}
             {trendPoints.map((point, index) => {
-              const emphasized = point.label === highlight || index === trendPoints.length - 1;
+              const emphasized =
+                point.label === highlight || index === trendPoints.length - 1;
               return (
                 <circle
                   key={`${point.label}-${index}`}
@@ -1215,7 +1217,10 @@ function MdxChart({
         <div className="mdx-chart-bars">
           {safeData.map((item, index) => {
             const emphasized = item.label === highlight;
-            const width = maxValue > 0 ? `${(Math.abs(item.value) / maxValue) * 100}%` : "0%";
+            const width =
+              maxValue > 0
+                ? `${(Math.abs(item.value) / maxValue) * 100}%`
+                : "0%";
             return (
               <div key={`${item.label}-${index}`} className="mdx-chart-bar-row">
                 <span className="mdx-chart-bar-label">{item.label}</span>
@@ -1225,7 +1230,11 @@ function MdxChart({
                     data-emphasized={emphasized ? "true" : "false"}
                     style={{
                       width,
-                      background: chartColorForTone(normalizedTone, index, emphasized),
+                      background: chartColorForTone(
+                        normalizedTone,
+                        index,
+                        emphasized,
+                      ),
                     }}
                   />
                 </div>
@@ -1600,7 +1609,7 @@ type SlideTokens = {
 
 const DEFAULT_TOKENS: SlideTokens = {
   slideBg: "#0e0d0a",
-  slideBorder: "#efefeb1f",
+  slideBorder: "#00000000",
   slideRadius: "10px",
   slidePadding: "32px",
   slideLayoutGap: "16px",
@@ -2185,8 +2194,16 @@ async function resolveProjectAssetSource(
   rawSrc: string,
 ): Promise<string> {
   const normalizedRelative = normalizeProjectRelativeAsset(rawSrc);
-  if (!normalizedRelative || !projectPath || !isTauriRuntime()) {
+  if (!normalizedRelative || !projectPath) {
     return rawSrc;
+  }
+
+  if (!isTauriRuntime()) {
+    const params = new URLSearchParams({
+      projectPath,
+      src: normalizedRelative,
+    });
+    return `/api/project-asset?${params.toString()}`;
   }
 
   const cacheKey = `${projectPath}::${normalizedRelative}`;
@@ -2960,18 +2977,16 @@ function EmbeddedDeckPreview({
             data-slide-status={slide.status}
             aria-busy={slide.status === "loading"}
           >
-            {slide.status === "ready" ? (
-              renderSceneNodes(
-                slide.nodes,
-                sceneRenderContext,
-                `slide-${slide.index}`,
-              )
-            ) : (
-              renderSlidePlaceholder(
-                slide,
-                presenterMode && slide.index === activeSlideIndex,
-              )
-            )}
+            {slide.status === "ready"
+              ? renderSceneNodes(
+                  slide.nodes,
+                  sceneRenderContext,
+                  `slide-${slide.index}`,
+                )
+              : renderSlidePlaceholder(
+                  slide,
+                  presenterMode && slide.index === activeSlideIndex,
+                )}
           </section>
         ))}
       </div>
