@@ -28,6 +28,7 @@ Core commands:
 - `desktop`
 - `health`
 - `state`
+- `analyze-project --path <absolute-project-path>`
 - `design-system`
 - `component-catalog`
 - `component-template --name <name>`
@@ -35,6 +36,9 @@ Core commands:
 - `recipe-template --name <name>`
 - `open-project --path <absolute-project-path>`
 - `validate-project --path <absolute-project-path>`
+- `compile-project-scene --path <absolute-project-path>`
+- `compile-project-scene-manifest --path <absolute-project-path>`
+- `compile-project-scene-slide --path <absolute-project-path> --index <N>`
 - `preview-url --path <absolute-project-path>`
 - `inspect-slide --path <absolute-project-path> [--slide N]`
 - `smoke --path <absolute-project-path> [--slide N]`
@@ -86,6 +90,12 @@ bash scripts/fastslides.sh validate-local --project-dir /absolute/path/to/projec
 bash scripts/fastslides.sh asset-audit --project-dir /absolute/path/to/project-folder --top 10
 ```
 
+If rendered output disagrees with the MDX, compile the slide scene before rewriting the deck:
+
+```bash
+bash scripts/fastslides.sh compile-project-scene-slide --path /absolute/path/to/project-folder --index 0
+```
+
 6. Inspect changed slides when layout or styling changed:
 
 ```bash
@@ -106,6 +116,8 @@ bash scripts/fastslides.sh smoke --path /absolute/path/to/project-folder --slide
 - Use empty space intentionally; do not fill the grid because it is available.
 - Treat overflow, clipping, and dense commentary rails as failures.
 - Keep assets inside the project folder and use relative paths.
+- Prefer native FastSlides primitives and real screenshots or editorial images over generated SVG diagrams for business decks.
+- If validation and scene compile are clean but captured preview assets are wrong, suspect preview/runtime asset resolution before rewriting the MDX.
 
 ## Deck Contract
 
@@ -139,5 +151,6 @@ Each slide should use:
 
 - Be expressive in the slide content, not random in the layout system.
 - Prefer strong composition over many decorative primitives.
+- Prefer semantic recipes like compare, operating model, or quote-plus-evidence before inventing custom diagrams.
 - Use the running app and MCP to inspect what exists before adding new structure.
 - Hand off only after validation and visual inspection both pass.

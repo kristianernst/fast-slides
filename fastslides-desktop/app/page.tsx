@@ -1611,8 +1611,8 @@ const DEFAULT_TOKENS: SlideTokens = {
   slideBg: "#0e0d0a",
   slideBorder: "#00000000",
   slideRadius: "10px",
-  slidePadding: "32px",
-  slideLayoutGap: "16px",
+  slidePadding: "24px",
+  slideLayoutGap: "14px",
   slideCardBg: "#ffffff08",
   slideCardBorder: "#00000000",
   slideCardRadius: "10px",
@@ -2203,7 +2203,7 @@ async function resolveProjectAssetSource(
       projectPath,
       src: normalizedRelative,
     });
-    return `/api/project-asset?${params.toString()}`;
+    return `${AGENT_HOOK_BASE_URL}/project-asset?${params.toString()}`;
   }
 
   const cacheKey = `${projectPath}::${normalizedRelative}`;

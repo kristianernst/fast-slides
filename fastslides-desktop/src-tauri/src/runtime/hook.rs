@@ -3,7 +3,8 @@ use crate::commands::{
     analyze_project, compile_project_scene, compile_project_scene_manifest,
     compile_project_scene_slide, get_app_state, get_component_catalog, get_component_template,
     get_composition_template, get_design_system, get_recipe_template, install_codex_mcp_server,
-    open_project, read_project_css, save_component_template, save_project_css, validate_project,
+    open_project, read_project_asset, read_project_css, save_component_template, save_project_css,
+    validate_project,
 };
 use crate::constants::DEFAULT_AGENT_HOOK_ADDR;
 use crate::design_system::SaveComponentPayload;
@@ -59,6 +60,22 @@ fn json_response(status_code: u16, payload: impl serde::Serialize) -> Response<C
 
 fn empty_response(status_code: u16) -> Response<Cursor<Vec<u8>>> {
     let mut response = Response::from_string("").with_status_code(StatusCode(status_code));
+    add_agent_hook_cors_headers(&mut response);
+    response
+}
+
+fn bytes_response(
+    status_code: u16,
+    bytes: Vec<u8>,
+    content_type: &str,
+) -> Response<Cursor<Vec<u8>>> {
+    let mut response = Response::from_data(bytes).with_status_code(StatusCode(status_code));
+    if let Ok(content_type_header) = Header::from_bytes("Content-Type", content_type) {
+        response.add_header(content_type_header);
+    }
+    if let Ok(cache_control) = Header::from_bytes("Cache-Control", "no-store") {
+        response.add_header(cache_control);
+    }
     add_agent_hook_cors_headers(&mut response);
     response
 }
@@ -298,6 +315,36 @@ fn handle_agent_hook_request(
             match read_project_css(project_path) {
                 Ok(css) => json_response(200, css),
                 Err(error) => json_error_response(400, error),
+            }
+        }
+        (&Method::Get, "/project-asset") => {
+            let project_path = parsed_url
+                .query_pairs()
+                .find_map(|(key, value)| (key == "projectPath").then(|| value.into_owned()))
+                .unwrap_or_default();
+            let raw_src = parsed_url
+                .query_pairs()
+                .find_map(|(key, value)| (key == "src").then(|| value.into_owned()))
+                .unwrap_or_default();
+
+            if project_path.trim().is_empty() || raw_src.trim().is_empty() {
+                return json_error_response(
+                    400,
+                    "Missing required query parameters: projectPath and src".to_string(),
+                );
+            }
+
+            match read_project_asset(project_path.as_str(), raw_src.as_str()) {
+                Ok(Some(asset)) => bytes_response(200, asset.bytes, asset.mime_type),
+                Ok(None) => json_error_response(400, "Invalid local asset path.".to_string()),
+                Err(error) => {
+                    let status = if error.starts_with("Missing asset target") {
+                        404
+                    } else {
+                        400
+                    };
+                    json_error_response(status, error)
+                }
             }
         }
         (&Method::Post, "/open-project") => {

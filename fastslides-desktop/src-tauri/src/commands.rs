@@ -14,6 +14,7 @@ pub(crate) use project::{
 };
 pub(crate) use scene::{
     analyze_project, capture_slide_image, compile_project_scene, compile_project_scene_manifest,
-    compile_project_scene_slide, resolve_project_asset_data_url, start_project_scene_session,
+    compile_project_scene_slide, read_project_asset, resolve_project_asset_data_url,
+    start_project_scene_session,
 };
 pub(crate) use system::{export_fastslides_skill, install_codex_mcp_server, open_in_file_manager};

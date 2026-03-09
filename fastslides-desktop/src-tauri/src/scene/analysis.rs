@@ -43,6 +43,19 @@ impl AreaFrame {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+struct AreaContentSummary {
+    has_caption: bool,
+    has_takeaway: bool,
+    has_body: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct LayoutBalanceStats {
+    earliest_body_y: Option<usize>,
+    deepest_caption_bottom: Option<usize>,
+}
+
 pub(crate) fn next_scene_session_id() -> String {
     let next = SCENE_SESSION_COUNTER.fetch_add(1, Ordering::Relaxed);
     format!("scene-session-{}-{next}", crate::now_epoch_seconds())
@@ -225,6 +238,184 @@ pub(crate) fn collect_project_scene_session_events(
 fn push_contract_warning(seen: &mut HashSet<String>, warnings: &mut Vec<String>, message: String) {
     if seen.insert(message.clone()) {
         warnings.push(message);
+    }
+}
+
+fn merge_area_content_summary(
+    current: AreaContentSummary,
+    next: AreaContentSummary,
+) -> AreaContentSummary {
+    AreaContentSummary {
+        has_caption: current.has_caption || next.has_caption,
+        has_takeaway: current.has_takeaway || next.has_takeaway,
+        has_body: current.has_body || next.has_body,
+    }
+}
+
+fn summarize_area_content(nodes: &[SceneNode]) -> AreaContentSummary {
+    let mut summary = AreaContentSummary::default();
+
+    for node in nodes {
+        let next = match node {
+            SceneNode::Canvas { children, .. }
+            | SceneNode::Area { children, .. }
+            | SceneNode::LayoutGroup { children, .. } => summarize_area_content(children),
+            SceneNode::Surface {
+                component,
+                children,
+                ..
+            } => {
+                let mut nested = summarize_area_content(children);
+                if matches!(component.as_str(), "Card" | "Panel" | "Callout" | "Quote") {
+                    nested.has_body = true;
+                }
+                nested
+            }
+            SceneNode::Metric { .. }
+            | SceneNode::Chart { .. }
+            | SceneNode::List { .. }
+            | SceneNode::Media { .. }
+            | SceneNode::CodeBlock { .. }
+            | SceneNode::Pill { .. }
+            | SceneNode::Raw { .. } => AreaContentSummary {
+                has_body: true,
+                ..AreaContentSummary::default()
+            },
+            SceneNode::Text { role, text, .. } => match role.as_str() {
+                "caption" => AreaContentSummary {
+                    has_caption: true,
+                    ..AreaContentSummary::default()
+                },
+                "takeaway" => AreaContentSummary {
+                    has_takeaway: true,
+                    ..AreaContentSummary::default()
+                },
+                "kicker" => AreaContentSummary::default(),
+                _ if clean_scene_text(text).is_empty() => AreaContentSummary::default(),
+                _ => AreaContentSummary {
+                    has_body: true,
+                    ..AreaContentSummary::default()
+                },
+            },
+            SceneNode::Arrow { .. } | SceneNode::Rule { .. } => AreaContentSummary::default(),
+        };
+
+        summary = merge_area_content_summary(summary, next);
+    }
+
+    summary
+}
+
+fn collect_layout_balance_stats(
+    nodes: &[SceneNode],
+    canvas: Option<CanvasFrame>,
+    stats: &mut LayoutBalanceStats,
+) {
+    for node in nodes {
+        match node {
+            SceneNode::Canvas {
+                cols,
+                rows,
+                children,
+                ..
+            } => collect_layout_balance_stats(
+                children,
+                Some(CanvasFrame {
+                    cols: *cols,
+                    rows: *rows,
+                }),
+                stats,
+            ),
+            SceneNode::Area {
+                x: _,
+                y,
+                w: _,
+                h,
+                children,
+                ..
+            } => {
+                if canvas.is_some() {
+                    let summary = summarize_area_content(children);
+                    let bottom_edge = y.saturating_add(*h).saturating_sub(1);
+
+                    if summary.has_body && !summary.has_takeaway {
+                        stats.earliest_body_y =
+                            Some(stats.earliest_body_y.map_or(*y, |current| current.min(*y)));
+                    }
+
+                    if summary.has_caption {
+                        stats.deepest_caption_bottom = Some(
+                            stats
+                                .deepest_caption_bottom
+                                .map_or(bottom_edge, |current| current.max(bottom_edge)),
+                        );
+                    }
+                }
+
+                collect_layout_balance_stats(children, canvas, stats);
+            }
+            SceneNode::LayoutGroup { children, .. } | SceneNode::Surface { children, .. } => {
+                collect_layout_balance_stats(children, canvas, stats);
+            }
+            SceneNode::Metric { .. }
+            | SceneNode::Chart { .. }
+            | SceneNode::Text { .. }
+            | SceneNode::List { .. }
+            | SceneNode::Media { .. }
+            | SceneNode::Arrow { .. }
+            | SceneNode::CodeBlock { .. }
+            | SceneNode::Pill { .. }
+            | SceneNode::Rule { .. }
+            | SceneNode::Raw { .. } => {}
+        }
+    }
+}
+
+fn collect_layout_balance_warnings(
+    nodes: &[SceneNode],
+    seen: &mut HashSet<String>,
+    warnings: &mut Vec<String>,
+) {
+    let mut stats = LayoutBalanceStats::default();
+    let mut canvas_frame = None;
+
+    for node in nodes {
+        if let SceneNode::Canvas { cols, rows, .. } = node {
+            canvas_frame = Some(CanvasFrame {
+                cols: *cols,
+                rows: *rows,
+            });
+            break;
+        }
+    }
+
+    collect_layout_balance_stats(nodes, None, &mut stats);
+
+    let Some(canvas) = canvas_frame else {
+        return;
+    };
+
+    let late_body_threshold = (canvas.rows * 36).div_ceil(100);
+    if stats
+        .earliest_body_y
+        .is_some_and(|value| value > late_body_threshold)
+    {
+        push_contract_warning(
+            seen,
+            warnings,
+            "Main body starts too low on the canvas and leaves avoidable empty space above the exhibit. Pull the body up or shrink the header chrome.".to_string(),
+        );
+    }
+
+    if stats
+        .deepest_caption_bottom
+        .is_some_and(|bottom| bottom < canvas.rows.saturating_sub(1))
+    {
+        push_contract_warning(
+            seen,
+            warnings,
+            "Caption or source sits too high on the canvas. Push note areas closer to the bottom edge.".to_string(),
+        );
     }
 }
 
@@ -603,6 +794,7 @@ pub(crate) fn slide_contract_warnings(slide: &str) -> Vec<String> {
     let mut seen = HashSet::<String>::new();
     let nodes = compile_slide_nodes(slide);
     collect_scene_contract_warnings(&nodes, None, None, None, &mut seen, &mut warnings);
+    collect_layout_balance_warnings(&nodes, &mut seen, &mut warnings);
     warnings
 }
 

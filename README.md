@@ -30,6 +30,8 @@ Hook API:
 
 - `GET http://127.0.0.1:38473/health`
 - `GET http://127.0.0.1:38473/app-state`
+- `GET http://127.0.0.1:38473/analyze-project?path=...`
+- `GET http://127.0.0.1:38473/compile-project-scene-slide?path=...&index=...`
 - `POST http://127.0.0.1:38473/open-project`
 - `POST http://127.0.0.1:38473/validate-project`
 - `GET http://127.0.0.1:38473/preview-url?path=...`
@@ -76,6 +78,8 @@ Rules:
 - prefer recipe/composition templates before raw placement
 - keep one conclusion per slide
 - keep assets inside the deck folder
+- prefer real screenshots or native primitives over generated SVG diagrams for business decks
+- if preview assets look broken but validation and scene compile are clean, debug runtime asset resolution before rewriting the slide
 - validate structurally, then inspect visually
 
 ## Repo layout

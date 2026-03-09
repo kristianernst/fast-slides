@@ -399,6 +399,8 @@ function LibraryPreview({
   const calloutTitle = extractAttribute(source, "Callout", "title");
   const calloutTone = extractAttribute(source, "Callout", "tone") || "accent";
   const calloutBody = extractTagContent(source, "Callout");
+  const quoteAttribution = extractAttribute(source, "Quote", "attribution");
+  const quoteBody = extractTagContent(source, "Quote");
   const panelTitle = extractAttribute(source, "Panel", "title");
   const panelTone = extractAttribute(source, "Panel", "tone") || "default";
   const panelBody = extractTagContent(source, "Panel");
@@ -476,6 +478,20 @@ function LibraryPreview({
         </div>
       </aside>,
       "library-preview-stage--rail",
+    );
+  }
+
+  if (name === "quote") {
+    return renderPreview(
+      <blockquote className="mdx-quote">
+        <div className="mdx-quote-body">
+          {quoteBody ||
+            "Replace with one sharp proof point in the speaker's own words."}
+        </div>
+        {quoteAttribution ? (
+          <footer className="mdx-quote-attribution">{quoteAttribution}</footer>
+        ) : null}
+      </blockquote>,
     );
   }
 
@@ -757,6 +773,134 @@ function LibraryPreview({
             </section>
           ))}
         </div>
+      </>,
+    );
+  }
+
+  if (name === "beforeafter" || name === "static_vs_dynamic_compare") {
+    const previewPanels = panels.length
+      ? panels
+      : [
+          { title: "Before", tone: "default" },
+          { title: "After", tone: "accent" },
+        ];
+    return renderPreview(
+      <>
+        {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
+        {takeaway ? (
+          <h2 className="mdx-takeaway" data-scale="compact">
+            {takeaway}
+          </h2>
+        ) : null}
+        <div className="library-preview-grid library-preview-grid--two">
+          {previewPanels.slice(0, 2).map((panel, index) => (
+            <section
+              key={`${panel.title}-${index}`}
+              className={`mdx-panel ${panel.tone && panel.tone !== "default" ? `mdx-panel--${panel.tone}` : ""}`.trim()}
+              data-variant="compact"
+            >
+              <div className="mdx-panel-head">
+                <h3 className="mdx-panel-title">
+                  {panel.title || (index === 0 ? "Before" : "After")}
+                </h3>
+              </div>
+              <div className="mdx-panel-body">
+                <p>
+                  {index === 0
+                    ? "Replace with the current state."
+                    : "Replace with the target state after the shift."}
+                </p>
+              </div>
+            </section>
+          ))}
+        </div>
+        {caption ? <div className="mdx-caption">{caption}</div> : null}
+      </>,
+    );
+  }
+
+  if (name === "operatingmodelrow" || name === "operating_model") {
+    const previewPanels = panels.length
+      ? panels
+      : [
+          { title: "Sense", tone: "accent" },
+          { title: "Decide", tone: "default" },
+          { title: "Act", tone: "default" },
+        ];
+    return renderPreview(
+      <>
+        {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
+        {takeaway ? (
+          <h2 className="mdx-takeaway" data-scale="compact">
+            {takeaway}
+          </h2>
+        ) : null}
+        <div className="library-preview-grid library-preview-grid--three">
+          {previewPanels.slice(0, 3).map((panel, index) => (
+            <section
+              key={`${panel.title}-${index}`}
+              className={`mdx-panel ${panel.tone && panel.tone !== "default" ? `mdx-panel--${panel.tone}` : ""}`.trim()}
+              data-variant="compact"
+            >
+              <div className="mdx-panel-head">
+                <h3 className="mdx-panel-title">
+                  {panel.title || `Stage ${index + 1}`}
+                </h3>
+              </div>
+              <div className="mdx-panel-body">
+                <p>
+                  {index === 0
+                    ? "Inputs and signals"
+                    : index === 1
+                      ? "Rules and routing"
+                      : "Execution and review"}
+                </p>
+              </div>
+            </section>
+          ))}
+        </div>
+        {caption ? <div className="mdx-caption">{caption}</div> : null}
+      </>,
+    );
+  }
+
+  if (name === "quoteevidence" || name === "quote_with_evidence") {
+    return renderPreview(
+      <>
+        {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
+        {takeaway ? (
+          <h2 className="mdx-takeaway" data-scale="compact">
+            {takeaway}
+          </h2>
+        ) : null}
+        <div className="library-preview-grid library-preview-grid--recipe">
+          <blockquote className="mdx-quote">
+            <div className="mdx-quote-body">
+              {quoteBody ||
+                "Replace with one proof quote that deserves executive attention."}
+            </div>
+            {quoteAttribution ? (
+              <footer className="mdx-quote-attribution">
+                {quoteAttribution}
+              </footer>
+            ) : null}
+          </blockquote>
+          <section
+            className={`mdx-panel ${panelTone !== "default" ? `mdx-panel--${panelTone}` : ""}`.trim()}
+            data-variant="compact"
+          >
+            <div className="mdx-panel-head">
+              <h3 className="mdx-panel-title">{panelTitle || "Evidence"}</h3>
+            </div>
+            <div className="mdx-panel-body">
+              <p>
+                {panelBody ||
+                  "Replace with the structured evidence that supports the quote."}
+              </p>
+            </div>
+          </section>
+        </div>
+        {caption ? <div className="mdx-caption">{caption}</div> : null}
       </>,
     );
   }

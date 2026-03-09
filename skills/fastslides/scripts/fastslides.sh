@@ -14,6 +14,8 @@ Commands:
   desktop [--install]                          Launch FastSlides Desktop (tauri:dev)
   health                                       Hook server health check
   state                                        Read hook app state
+  analyze-project --path <absolute-project-path>
+                                                Run project density and outline analysis
   design-system                                Read the base FastSlides design-system registry
   component-catalog                            Read the FastSlides component phonebook
   install-codex-mcp                            Install FastSlides MCP into Codex config.toml
@@ -23,6 +25,12 @@ Commands:
   open-project --path <absolute-project-path>  Open project in desktop app
   validate-project --path <absolute-project-path>
                                                 Run desktop validation for a project
+  compile-project-scene --path <absolute-project-path>
+                                                Compile the full typed scene graph
+  compile-project-scene-manifest --path <absolute-project-path>
+                                                Compile slide metadata and manifest only
+  compile-project-scene-slide --path <absolute-project-path> --index <N>
+                                                Compile one slide scene node tree by zero-based index
   preview-url --path <absolute-project-path>   Build browser preview URL for a project path
   inspect-slide --path <absolute-project-path> [--slide N] [--output-dir DIR] [--headed]
                                                 Ask the backend to capture a slide screenshot and return the PNG path
@@ -192,6 +200,57 @@ hook_preview_url() {
   project_path="$(parse_path_arg "$@")"
   require_cmd curl
   exec curl -sS -G "${BASE_URL}/preview-url" --data-urlencode "path=${project_path}"
+}
+
+hook_get_path() {
+  local endpoint="$1"
+  shift
+  local project_path
+  project_path="$(parse_path_arg "$@")"
+  require_cmd curl
+  exec curl -sS -G "${BASE_URL}${endpoint}" --data-urlencode "path=${project_path}"
+}
+
+hook_compile_project_scene_slide() {
+  local project_path=""
+  local slide_index=""
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --path)
+        project_path="${2:-}"
+        shift 2
+        ;;
+      --index)
+        slide_index="${2:-}"
+        shift 2
+        ;;
+      *)
+        echo "Unknown argument: $1" >&2
+        usage
+        exit 1
+        ;;
+    esac
+  done
+
+  if [[ -z "${project_path}" ]]; then
+    echo "Missing required argument: --path <absolute-project-path>" >&2
+    exit 1
+  fi
+  if [[ -z "${slide_index}" ]]; then
+    echo "Missing required argument: --index <zero-based-slide-index>" >&2
+    exit 1
+  fi
+  if [[ ! "${slide_index}" =~ ^[0-9]+$ ]]; then
+    echo "--index must be a zero-based integer." >&2
+    exit 1
+  fi
+
+  require_cmd curl
+  exec curl -sS -G \
+    "${BASE_URL}/compile-project-scene-slide" \
+    --data-urlencode "path=${project_path}" \
+    --data-urlencode "index=${slide_index}"
 }
 
 hook_named_template() {
@@ -384,32 +443,44 @@ case "${cmd}" in
   health)
     hook_get "/health"
     ;;
-    state)
-      hook_get "/app-state"
-      ;;
-    design-system)
-      hook_get "/design-system"
-      ;;
-    component-catalog)
-      hook_get "/component-catalog"
-      ;;
-    component-template)
-      hook_named_template "/component-template" "$@"
-      ;;
-    install-codex-mcp)
-      hook_post_empty "/install-codex-mcp"
-      ;;
-    composition-template)
-      hook_named_template "/composition-template" "$@"
-      ;;
-    recipe-template)
-      hook_named_template "/recipe-template" "$@"
-      ;;
-    open-project)
-      hook_post_path "/open-project" "$@"
-      ;;
+  state)
+    hook_get "/app-state"
+    ;;
+  analyze-project)
+    hook_get_path "/analyze-project" "$@"
+    ;;
+  design-system)
+    hook_get "/design-system"
+    ;;
+  component-catalog)
+    hook_get "/component-catalog"
+    ;;
+  component-template)
+    hook_named_template "/component-template" "$@"
+    ;;
+  install-codex-mcp)
+    hook_post_empty "/install-codex-mcp"
+    ;;
+  composition-template)
+    hook_named_template "/composition-template" "$@"
+    ;;
+  recipe-template)
+    hook_named_template "/recipe-template" "$@"
+    ;;
+  open-project)
+    hook_post_path "/open-project" "$@"
+    ;;
   validate-project)
     hook_post_path "/validate-project" "$@"
+    ;;
+  compile-project-scene)
+    hook_get_path "/compile-project-scene" "$@"
+    ;;
+  compile-project-scene-manifest)
+    hook_get_path "/compile-project-scene-manifest" "$@"
+    ;;
+  compile-project-scene-slide)
+    hook_compile_project_scene_slide "$@"
     ;;
   preview-url)
     hook_preview_url "$@"

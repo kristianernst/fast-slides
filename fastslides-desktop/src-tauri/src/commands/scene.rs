@@ -18,6 +18,11 @@ use crate::scene::{
     ProjectSceneSessionHandle, SceneSlide,
 };
 
+pub(crate) struct ProjectAssetBytes {
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) mime_type: &'static str,
+}
+
 fn normalized_session_id(session_id: Option<String>) -> String {
     session_id
         .map(|value| value.trim().to_string())
@@ -51,7 +56,23 @@ fn resolved_project_asset_path(
         .map(Some)
 }
 
-fn asset_data_url(resolved_path: &Path, raw_src: &str) -> Result<String, String> {
+fn asset_data_url(mime_type: &str, asset_bytes: &[u8]) -> String {
+    let encoded = base64::engine::general_purpose::STANDARD.encode(asset_bytes);
+    format!("data:{mime_type};base64,{encoded}")
+}
+
+pub(crate) fn read_project_asset(
+    project_path: &str,
+    raw_src: &str,
+) -> Result<Option<ProjectAssetBytes>, String> {
+    if raw_src.trim().is_empty() || raw_src.trim().starts_with('#') {
+        return Ok(None);
+    }
+
+    let Some(resolved_path) = resolved_project_asset_path(project_path, raw_src)? else {
+        return Ok(None);
+    };
+
     if !resolved_path.exists() {
         return Err(format!(
             "Missing asset target: {} -> {}",
@@ -68,11 +89,12 @@ fn asset_data_url(resolved_path: &Path, raw_src: &str) -> Result<String, String>
         ));
     }
 
-    let asset_bytes = fs::read(resolved_path)
+    let bytes = fs::read(&resolved_path)
         .map_err(|error| format!("Failed to read {}: {error}", resolved_path.display()))?;
-    let mime_type = mime_type_for_path(resolved_path);
-    let encoded = base64::engine::general_purpose::STANDARD.encode(asset_bytes);
-    Ok(format!("data:{mime_type};base64,{encoded}"))
+    Ok(Some(ProjectAssetBytes {
+        bytes,
+        mime_type: mime_type_for_path(&resolved_path),
+    }))
 }
 
 #[tauri::command]
@@ -159,13 +181,8 @@ pub(crate) fn resolve_project_asset_data_url(
     project_path: String,
     raw_src: String,
 ) -> Result<String, String> {
-    if raw_src.trim().is_empty() || raw_src.trim().starts_with('#') {
-        return Ok(raw_src);
-    }
-
-    let Some(resolved_path) = resolved_project_asset_path(&project_path, &raw_src)? else {
+    let Some(asset) = read_project_asset(&project_path, &raw_src)? else {
         return Ok(raw_src);
     };
-
-    asset_data_url(&resolved_path, &raw_src)
+    Ok(asset_data_url(asset.mime_type, &asset.bytes))
 }

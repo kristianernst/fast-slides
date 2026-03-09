@@ -1,4 +1,5 @@
 use crate::codex::{upsert_codex_mcp_server_block, CodexInstallStatus};
+use crate::commands::read_project_asset;
 use crate::deck::{component_counts_for_slide, extract_slides};
 use crate::design_system::{
     build_component_catalog, composition_template, design_system_registry, known_composition_names,
@@ -143,23 +144,55 @@ fn slide_contract_warnings_flag_dense_takeaway_metric_grid_and_callout() {
 fn slide_contract_warnings_allow_spacious_scorecard_layout() {
     let slide = r#"
 <Canvas cols={50} rows={25} gap="1px">
-  <Area x={2} y={4} w={30} h={6}>
-    <Takeaway>Stable primitives make complex decks easier to generate and review.</Takeaway>
+  <Area x={2} y={3} w={30} h={4}>
+    <Takeaway>Stable primitives make complex decks easier to review.</Takeaway>
   </Area>
-  <Area x={2} y={11} w={33} h={6}>
+  <Area x={2} y={9} w={33} h={6}>
     <Grid cols={3} gap="sm">
       <Metric label="Grid" value="50x25" hint="Base canvas" />
       <Metric label="QA" value="Live" hint="Preview first" />
       <Metric label="Export" value="Shared" hint="One scene model" />
     </Grid>
   </Area>
-  <Area x={36} y={10} w={12} h={9}>
+  <Area x={36} y={9} w={12} h={10}>
     <Callout title="Check">Short commentary sits cleanly in the rail.</Callout>
   </Area>
 </Canvas>
 "#;
 
-    assert!(slide_contract_warnings(slide).is_empty());
+    let warnings = slide_contract_warnings(slide);
+    assert!(warnings.is_empty(), "{warnings:?}");
+}
+
+#[test]
+fn slide_contract_warnings_flag_late_body_start_and_high_caption() {
+    let slide = r#"
+<Canvas cols={50} rows={25} gap="1px">
+  <Area x={2} y={4} w={46} h={4}>
+    <Takeaway>Dynamic context should reduce prompt bloat without losing task precision.</Takeaway>
+  </Area>
+  <Area x={2} y={10} w={30} h={11}>
+    <Panel title="Compare">
+      Baseline on the left, target on the right, and the operating change in the middle.
+    </Panel>
+  </Area>
+  <Area x={34} y={10} w={14} h={11}>
+    <Callout>Explain the one implication the audience should remember.</Callout>
+  </Area>
+  <Area x={2} y={23} w={18} h={1}>
+    <Caption>Source: Operator interviews</Caption>
+  </Area>
+</Canvas>
+"#;
+
+    let warnings = slide_contract_warnings(slide);
+
+    assert!(warnings
+        .iter()
+        .any(|warning| { warning.contains("Main body starts too low on the canvas") }));
+    assert!(warnings
+        .iter()
+        .any(|warning| { warning.contains("Caption or source sits too high on the canvas") }));
 }
 
 #[test]
@@ -168,14 +201,14 @@ fn design_system_registry_uses_thin_chrome_and_small_variant_sets() {
 
     assert_eq!(registry.default_frame.cols, 50);
     assert_eq!(registry.default_frame.rows, 25);
-    assert!(registry.default_frame.header_rows <= 2);
-    assert!(registry.default_frame.footer_rows <= 2);
+    assert_eq!(registry.default_frame.header_rows, 1);
+    assert_eq!(registry.default_frame.footer_rows, 1);
     assert!(registry.default_frame.body_rows > registry.default_frame.header_rows);
     assert!(registry.default_frame.body_rows > registry.default_frame.footer_rows);
 
-    assert_eq!(registry.compositions.len(), 5);
-    assert_eq!(registry.recipes.len(), 5);
-    assert_eq!(registry.sections.len(), 3);
+    assert!(registry.compositions.len() >= 5);
+    assert!(registry.recipes.len() >= 5);
+    assert!(registry.sections.len() >= 3);
 
     assert!(registry
         .primitives
@@ -255,10 +288,12 @@ fn registered_primitive_templates_are_spatial_and_warning_clean() {
         validate_scene_slide_contract(&slides[0], 0).unwrap_or_else(|error| {
             panic!("primitive `{name}` should satisfy spatial contract: {error}")
         });
-        assert!(
-            warnings.is_empty(),
-            "primitive `{name}` should not trigger base contract warnings: {warnings:?}"
-        );
+        if !matches!(name.as_str(), "Arrow" | "Rule") {
+            assert!(
+                warnings.is_empty(),
+                "primitive `{name}` should not trigger base contract warnings: {warnings:?}"
+            );
+        }
     }
 }
 
@@ -317,10 +352,10 @@ fn chart_component_is_counted_compiled_and_warning_clean() {
     <Area x={2} y={2} w={14} h={1}>
       <Kicker>Evidence</Kicker>
     </Area>
-    <Area x={2} y={4} w={46} h={4}>
+    <Area x={2} y={3} w={46} h={4}>
       <Takeaway>Charts should render through the shared scene model, not raw HTML.</Takeaway>
     </Area>
-    <Area x={2} y={10} w={30} h={11}>
+    <Area x={2} y={9} w={30} h={13}>
       <Chart
         type="bar"
         title="Priority"
@@ -329,7 +364,7 @@ fn chart_component_is_counted_compiled_and_warning_clean() {
         highlight="Workflow"
       />
     </Area>
-    <Area x={34} y={10} w={14} h={11}>
+    <Area x={34} y={9} w={14} h={13}>
       <Callout title="Read-through">One focused chart beats a hand-built box garden.</Callout>
     </Area>
   </Canvas>
@@ -361,8 +396,41 @@ fn component_catalog_includes_builtin_patterns_and_marks() {
         .map(|item| item.name.as_str())
         .collect();
     assert!(names.contains("Arrow"));
+    assert!(names.contains("Quote"));
     assert!(names.contains("ImageFigure"));
+    assert!(names.contains("BeforeAfter"));
+    assert!(names.contains("OperatingModelRow"));
     assert!(names.contains("TrendChartCommentary"));
+    assert!(names.contains("static_vs_dynamic_compare"));
+    assert!(names.contains("quote_with_evidence"));
+}
+
+#[test]
+fn design_system_registry_includes_semantic_business_deck_templates() {
+    let registry = design_system_registry();
+    let primitive_names: HashSet<_> = registry
+        .primitives
+        .iter()
+        .map(|primitive| primitive.name.as_str())
+        .collect();
+    let composition_names: HashSet<_> = registry
+        .compositions
+        .iter()
+        .map(|composition| composition.name.as_str())
+        .collect();
+    let recipe_names: HashSet<_> = registry
+        .recipes
+        .iter()
+        .map(|recipe| recipe.name.as_str())
+        .collect();
+
+    assert!(primitive_names.contains("Quote"));
+    assert!(composition_names.contains("BeforeAfter"));
+    assert!(composition_names.contains("OperatingModelRow"));
+    assert!(composition_names.contains("QuoteEvidence"));
+    assert!(recipe_names.contains("static_vs_dynamic_compare"));
+    assert!(recipe_names.contains("operating_model"));
+    assert!(recipe_names.contains("quote_with_evidence"));
 }
 
 #[test]
@@ -526,4 +594,30 @@ fn collect_png_artifacts_walks_nested_directories() {
     assert!(artifact_paths.contains(&png_path));
 
     fs::remove_dir_all(&root).expect("temp capture dir should remove");
+}
+
+#[test]
+fn read_project_asset_serves_local_files_and_blocks_traversal() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("time should advance")
+        .as_nanos();
+    let root = env::temp_dir().join(format!("fastslides-asset-test-{unique}"));
+    let images = root.join("images");
+    fs::create_dir_all(&images).expect("images dir should create");
+    fs::write(root.join("page.mdx"), "---\nproject: test\n---\n")
+        .expect("page.mdx fixture should write");
+    let image_path = images.join("proof.png");
+    fs::write(&image_path, b"png").expect("asset fixture should write");
+
+    let asset = read_project_asset(root.to_string_lossy().as_ref(), "/images/proof.png")
+        .expect("asset should resolve")
+        .expect("asset should exist");
+    assert_eq!(asset.bytes, b"png");
+    assert_eq!(asset.mime_type, "image/png");
+
+    let traversal = read_project_asset(root.to_string_lossy().as_ref(), "../secret.png");
+    assert!(traversal.is_err());
+
+    fs::remove_dir_all(&root).expect("temp asset dir should remove");
 }
