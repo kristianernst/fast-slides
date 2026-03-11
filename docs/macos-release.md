@@ -60,8 +60,8 @@ Only set `FASTSLIDES_UPDATE_ENDPOINT` if releases will not live on `kristianerns
 2. Commit the version bump and push a tag:
 
 ```bash
-git tag v0.1.1
-git push origin v0.1.1
+git tag v0.1.2
+git push origin v0.1.2
 ```
 
 That triggers [`.github/workflows/release-macos.yml`](../.github/workflows/release-macos.yml), which:
