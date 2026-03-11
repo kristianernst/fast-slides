@@ -8,7 +8,7 @@ MCP_URL="${FASTSLIDES_MCP_URL:-http://127.0.0.1:38474/mcp}"
 usage() {
   cat <<USAGE
 Usage:
-  bash scripts/fastslides.sh <command> [options]
+  bash skills/fastslides/scripts/fastslides.sh <command> [options]
 
 Commands:
   desktop [--install]                          Launch FastSlides Desktop (tauri:dev)

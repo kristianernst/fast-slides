@@ -17,4 +17,7 @@ pub(crate) use scene::{
     compile_project_scene_slide, read_project_asset, resolve_project_asset_data_url,
     start_project_scene_session,
 };
-pub(crate) use system::{export_fastslides_skill, install_codex_mcp_server, open_in_file_manager};
+pub(crate) use system::{
+    check_app_update, export_fastslides_skill, install_app_update, install_codex_mcp_server,
+    open_in_file_manager,
+};

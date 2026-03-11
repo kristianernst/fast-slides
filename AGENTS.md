@@ -37,7 +37,8 @@ When the app is running, a local HTTP API is available at `http://127.0.0.1:3847
 
 ### Testing
 
-- No automated test suite exists in this repo.
+- Rust unit tests exist in `fastslides-desktop/src-tauri/src/tests.rs`.
+- Run `cargo test --manifest-path fastslides-desktop/src-tauri/Cargo.toml` for backend verification.
 - Validate functionality via the agent hook API endpoints and the local validation scripts in `skills/fastslides/scripts/`.
 
 ### Per-project slide CSS
@@ -46,4 +47,5 @@ Each project can include a `slides.css` file that overrides default slide stylin
 
 ### Sample project
 
-A sample deck project is at `projects/tauri-is-awesome/` with `page.mdx` and `assets/`.
+- No sample deck is currently bundled in this repo.
+- Use `bash skills/fastslides/scripts/init_deck_project.sh --project-dir /absolute/path/to/deck` to scaffold one.

@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 usage() {
   cat <<'USAGE'
 Usage:
-  bash scripts/init_deck_project.sh [--project <name> | --project-dir <path>] [options]
+  bash skills/fastslides/scripts/init_deck_project.sh [--project <name> | --project-dir <path>] [options]
 
 Options:
   --project <name>          Project folder name under --projects-dir
@@ -19,8 +19,8 @@ Options:
   --force                   Overwrite existing page.mdx
 
 Examples:
-  bash scripts/init_deck_project.sh --project tauri-cool --projects-dir /abs/projects
-  bash scripts/init_deck_project.sh --project-dir /abs/projects/tauri-cool --title "Why Tauri"
+  bash skills/fastslides/scripts/init_deck_project.sh --project tauri-cool --projects-dir /abs/projects
+  bash skills/fastslides/scripts/init_deck_project.sh --project-dir /abs/projects/tauri-cool --title "Why Tauri"
 USAGE
 }
 
@@ -30,4 +30,3 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 fi
 
 exec python3 "${SCRIPT_DIR}/scaffold_deck_project.py" "$@"
-

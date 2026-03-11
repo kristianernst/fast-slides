@@ -24,6 +24,7 @@ log = "0.4"
 tauri = { version = "2.10.0", features = ["macos-private-api", "tray-icon"] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-updater = "2.10.0"
 window-vibrancy = "0.7.1"
 regex = "1.12"
 tiny_http = "0.12"

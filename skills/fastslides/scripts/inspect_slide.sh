@@ -6,7 +6,7 @@ BASE_URL="${FASTSLIDES_AGENT_HOOK_URL:-http://127.0.0.1:38473}"
 usage() {
   cat <<USAGE
 Usage:
-  bash scripts/inspect_slide.sh --path <absolute-project-path> [--slide N] [--output-dir DIR] [--headed]
+  bash skills/fastslides/scripts/inspect_slide.sh --path <absolute-project-path> [--slide N] [--output-dir DIR] [--headed]
 
 Description:
   Calls the FastSlides backend slide-capture endpoint and returns the absolute

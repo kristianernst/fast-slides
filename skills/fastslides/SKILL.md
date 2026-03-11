@@ -20,7 +20,7 @@ Use this skill when an agent needs to create, edit, validate, or visually inspec
 Run everything through:
 
 ```bash
-bash scripts/fastslides.sh <command> [options]
+bash skills/fastslides/scripts/fastslides.sh <command> [options]
 ```
 
 Core commands:
@@ -60,52 +60,52 @@ Core commands:
 1. Start the app if needed:
 
 ```bash
-bash scripts/fastslides.sh desktop
+bash skills/fastslides/scripts/fastslides.sh desktop
 ```
 
 2. Confirm the hook is up:
 
 ```bash
-bash scripts/fastslides.sh health
+bash skills/fastslides/scripts/fastslides.sh health
 ```
 
 3. Read the available system before writing slides:
 
 ```bash
-bash scripts/fastslides.sh design-system
-bash scripts/fastslides.sh component-catalog
+bash skills/fastslides/scripts/fastslides.sh design-system
+bash skills/fastslides/scripts/fastslides.sh component-catalog
 ```
 
 4. Open the deck:
 
 ```bash
-bash scripts/fastslides.sh open-project --path /absolute/path/to/project-folder
+bash skills/fastslides/scripts/fastslides.sh open-project --path /absolute/path/to/project-folder
 ```
 
 5. Validate through the app and local validators:
 
 ```bash
-bash scripts/fastslides.sh validate-project --path /absolute/path/to/project-folder
-bash scripts/fastslides.sh validate-local --project-dir /absolute/path/to/project-folder
-bash scripts/fastslides.sh asset-audit --project-dir /absolute/path/to/project-folder --top 10
+bash skills/fastslides/scripts/fastslides.sh validate-project --path /absolute/path/to/project-folder
+bash skills/fastslides/scripts/fastslides.sh validate-local --project-dir /absolute/path/to/project-folder
+bash skills/fastslides/scripts/fastslides.sh asset-audit --project-dir /absolute/path/to/project-folder --top 10
 ```
 
 If rendered output disagrees with the MDX, compile the slide scene before rewriting the deck:
 
 ```bash
-bash scripts/fastslides.sh compile-project-scene-slide --path /absolute/path/to/project-folder --index 0
+bash skills/fastslides/scripts/fastslides.sh compile-project-scene-slide --path /absolute/path/to/project-folder --index 0
 ```
 
 6. Inspect changed slides when layout or styling changed:
 
 ```bash
-bash scripts/fastslides.sh inspect-slide --path /absolute/path/to/project-folder --slide 1
+bash skills/fastslides/scripts/fastslides.sh inspect-slide --path /absolute/path/to/project-folder --slide 1
 ```
 
 If you need one command for readiness plus capture, use:
 
 ```bash
-bash scripts/fastslides.sh smoke --path /absolute/path/to/project-folder --slide 1
+bash skills/fastslides/scripts/fastslides.sh smoke --path /absolute/path/to/project-folder --slide 1
 ```
 
 ## Authoring Rules
@@ -125,6 +125,7 @@ bash scripts/fastslides.sh smoke --path /absolute/path/to/project-folder --slide
 <project>/
   page.mdx
   slides.css
+  assets/
   images/
   media/
   data/
