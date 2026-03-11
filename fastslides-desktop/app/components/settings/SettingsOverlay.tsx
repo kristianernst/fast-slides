@@ -54,10 +54,26 @@ type DesignTemplate = {
   notes: string[];
 };
 
+type AppUpdateStatus = {
+  configured: boolean;
+  currentVersion: string;
+  available: boolean;
+  version: string | null;
+  date: string | null;
+  body: string | null;
+};
+
 type SettingsOverlayProps = {
   open: boolean;
   busy: boolean;
   settingsTab: SettingsTab;
+  showAppUpdate: boolean;
+  appUpdate: AppUpdateStatus | null;
+  updateBusy: boolean;
+  updateError: string;
+  updateNotice: string;
+  onCheckForUpdates: () => void;
+  onInstallUpdate: () => void;
   theme: "dark" | "light";
   onThemeChange: (theme: "dark" | "light") => void;
   mermaidThemeName: string;
@@ -1038,6 +1054,13 @@ export function SettingsOverlay({
   open,
   busy,
   settingsTab,
+  showAppUpdate,
+  appUpdate,
+  updateBusy,
+  updateError,
+  updateNotice,
+  onCheckForUpdates,
+  onInstallUpdate,
   theme,
   onThemeChange,
   mermaidThemeName,
@@ -1154,6 +1177,60 @@ export function SettingsOverlay({
                   </button>
                 </div>
               </div>
+
+              {showAppUpdate ? (
+                <div className="settings-section">
+                  <span className="settings-label">App updates</span>
+                  <div className="app-update-card">
+                    <div className="app-update-head">
+                      <span className="app-update-version">
+                        FastSlides{" "}
+                        {appUpdate?.currentVersion || "version unavailable"}
+                      </span>
+                      <p className="settings-hint">
+                        {!appUpdate
+                          ? "Checking release status for this build."
+                          : !appUpdate.configured
+                            ? "Updates are enabled only in release builds with the updater key."
+                            : appUpdate.available
+                              ? `FastSlides ${appUpdate.version} is ready to install.`
+                              : `FastSlides ${appUpdate.currentVersion} is current.`}
+                      </p>
+                      {appUpdate?.body ? (
+                        <p className="app-update-message">{appUpdate.body}</p>
+                      ) : null}
+                      {updateNotice ? (
+                        <p className="app-update-message">{updateNotice}</p>
+                      ) : null}
+                      {updateError ? (
+                        <p className="app-update-message is-error">
+                          {updateError}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="app-update-actions">
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={onCheckForUpdates}
+                        disabled={updateBusy}
+                      >
+                        {updateBusy ? "Checking..." : "Check for updates"}
+                      </button>
+                      {appUpdate?.configured && appUpdate.available ? (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={onInstallUpdate}
+                          disabled={updateBusy}
+                        >
+                          Install and relaunch
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               <div className="settings-section">
                 <span className="settings-label">Mermaid</span>

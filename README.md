@@ -24,6 +24,24 @@ Toolchain notes:
 - Type check: `npx tsc --noEmit`
 - Rust lint: `cargo clippy --manifest-path src-tauri/Cargo.toml`
 
+## Release
+
+FastSlides now has a macOS release pipeline built around GitHub Releases, ad-hoc signing, and GitHub-hosted autoupdates. Setup and release steps live in [`docs/macos-release.md`](docs/macos-release.md).
+
+## Install
+
+Install the latest macOS release into `~/Applications`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kristianernst/fast-slides/main/scripts/install-fastslides-macos.sh | bash
+```
+
+Rerun the same installer to update, or use:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kristianernst/fast-slides/main/scripts/update-fastslides-macos.sh | bash
+```
+
 ## Local agent surfaces
 
 Hook API:
@@ -66,6 +84,7 @@ Useful commands:
 <project>/
   page.mdx
   slides.css
+  assets/
   images/
   media/
   data/
@@ -85,5 +104,6 @@ Rules:
 ## Repo layout
 
 - [`fastslides-desktop/`](/Users/kristianernst/work/dev/tooling/fast-slides/fastslides-desktop): Tauri app
-- [`projects/`](/Users/kristianernst/work/dev/tooling/fast-slides/projects): sample decks
+- [`docs/`](/Users/kristianernst/work/dev/tooling/fast-slides/docs): release and workflow documentation
+- [`scripts/`](/Users/kristianernst/work/dev/tooling/fast-slides/scripts): installer and updater entrypoints
 - [`skills/fastslides/`](/Users/kristianernst/work/dev/tooling/fast-slides/skills/fastslides): agent skill and helper scripts

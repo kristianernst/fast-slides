@@ -61,6 +61,21 @@ type AppState = {
   projects: ProjectSummary[];
 };
 
+type AppUpdateStatus = {
+  configured: boolean;
+  currentVersion: string;
+  available: boolean;
+  version: string | null;
+  date: string | null;
+  body: string | null;
+};
+
+type AppUpdateInstallResult = {
+  installed: boolean;
+  version: string | null;
+  message: string;
+};
+
 type SettingsTab = "theme" | "library";
 
 type ComponentCatalogEntry = {
@@ -3069,6 +3084,10 @@ export default function Home() {
   const [componentTemplateLoading, setComponentTemplateLoading] =
     useState(false);
   const [componentTemplateError, setComponentTemplateError] = useState("");
+  const [appUpdate, setAppUpdate] = useState<AppUpdateStatus | null>(null);
+  const [updateBusy, setUpdateBusy] = useState(false);
+  const [updateError, setUpdateError] = useState("");
+  const [updateNotice, setUpdateNotice] = useState("");
   const sidebarResizeCleanupRef = useRef<(() => void) | null>(null);
   const previewDockHideTimerRef = useRef<number | null>(null);
   const previewDockHoveringRef = useRef(false);
@@ -3129,6 +3148,13 @@ export default function Home() {
       localStorage.setItem(SYNTAX_THEME_STATE_KEY, syntaxThemeName);
     }
   }, [syntaxThemeName]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+    void checkForAppUpdate(true);
+  }, []);
 
   const projects = appState?.projects || [];
 
@@ -4118,6 +4144,67 @@ export default function Home() {
     });
   }
 
+  async function checkForAppUpdate(silent = false): Promise<void> {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    setUpdateBusy(true);
+    if (!silent) {
+      setUpdateError("");
+      setUpdateNotice("");
+    }
+
+    try {
+      const next = await call<AppUpdateStatus>("check_app_update");
+      setAppUpdate(next);
+      setUpdateError("");
+      if (!silent) {
+        setUpdateNotice(
+          !next.configured
+            ? "App updates activate in release builds with the updater key."
+            : next.available
+              ? `FastSlides ${next.version} is ready to install.`
+              : `FastSlides ${next.currentVersion} is current.`,
+        );
+      }
+    } catch (error) {
+      console.error("Failed to check for updates:", error);
+      if (!silent) {
+        setUpdateError(
+          error instanceof Error ? error.message : "Failed to check for updates.",
+        );
+      }
+    } finally {
+      setUpdateBusy(false);
+    }
+  }
+
+  async function handleInstallAppUpdate(): Promise<void> {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
+    setUpdateBusy(true);
+    setUpdateError("");
+    setUpdateNotice("");
+
+    try {
+      const result = await call<AppUpdateInstallResult>("install_app_update");
+      setUpdateNotice(result.message);
+      if (!result.installed) {
+        await checkForAppUpdate(true);
+      }
+    } catch (error) {
+      console.error("Failed to install update:", error);
+      setUpdateError(
+        error instanceof Error ? error.message : "Failed to install update.",
+      );
+    } finally {
+      setUpdateBusy(false);
+    }
+  }
+
   async function handleExportSkillArchive(): Promise<void> {
     await withBusy(async () => {
       if (!isTauriRuntime()) {
@@ -4313,6 +4400,17 @@ export default function Home() {
         open={settingsOpen}
         busy={busy}
         settingsTab={settingsTab}
+        showAppUpdate={isTauriRuntime()}
+        appUpdate={appUpdate}
+        updateBusy={updateBusy}
+        updateError={updateError}
+        updateNotice={updateNotice}
+        onCheckForUpdates={() => {
+          void checkForAppUpdate();
+        }}
+        onInstallUpdate={() => {
+          void handleInstallAppUpdate();
+        }}
         theme={theme}
         onThemeChange={(nextTheme) => setTheme(nextTheme)}
         mermaidThemeName={mermaidThemeName}

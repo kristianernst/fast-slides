@@ -14,13 +14,14 @@ mod scene;
 mod tests;
 
 use commands::{
-    add_projects_root, analyze_project, capture_slide_image, compile_project_scene,
-    compile_project_scene_manifest, compile_project_scene_slide, create_project,
-    export_fastslides_skill, get_app_state, get_component_catalog, get_component_template,
-    get_composition_template, get_design_system, get_recipe_template, install_codex_mcp_server,
-    load_project, open_in_file_manager, open_project, read_project_css, remove_project,
-    remove_projects_root, resolve_project_asset_data_url, save_component_template, save_project,
-    save_project_css, start_project_scene_session, toggle_project_pin, validate_project,
+    add_projects_root, analyze_project, capture_slide_image, check_app_update,
+    compile_project_scene, compile_project_scene_manifest, compile_project_scene_slide,
+    create_project, export_fastslides_skill, get_app_state, get_component_catalog,
+    get_component_template, get_composition_template, get_design_system, get_recipe_template,
+    install_app_update, install_codex_mcp_server, load_project, open_in_file_manager, open_project,
+    read_project_css, remove_project, remove_projects_root, resolve_project_asset_data_url,
+    save_component_template, save_project, save_project_css, start_project_scene_session,
+    toggle_project_pin, validate_project,
 };
 use runtime::{
     build_app_menu, handle_menu_event, setup_mcp_tray_icon, start_agent_hook_server,
@@ -58,6 +59,7 @@ pub fn run() {
         .menu(build_app_menu)
         .on_menu_event(handle_menu_event)
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             #[cfg(target_os = "macos")]
             {
@@ -84,6 +86,7 @@ pub fn run() {
             add_projects_root,
             analyze_project,
             capture_slide_image,
+            check_app_update,
             compile_project_scene,
             compile_project_scene_manifest,
             compile_project_scene_slide,
@@ -94,6 +97,7 @@ pub fn run() {
             get_design_system,
             get_recipe_template,
             get_app_state,
+            install_app_update,
             install_codex_mcp_server,
             load_project,
             open_project,
