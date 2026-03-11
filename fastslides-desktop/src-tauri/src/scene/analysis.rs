@@ -395,10 +395,10 @@ fn collect_layout_balance_warnings(
         return;
     };
 
-    let late_body_threshold = (canvas.rows * 36).div_ceil(100);
+    let late_body_threshold = (canvas.rows * 30).div_ceil(100);
     if stats
         .earliest_body_y
-        .is_some_and(|value| value > late_body_threshold)
+        .is_some_and(|value| value >= late_body_threshold)
     {
         push_contract_warning(
             seen,
@@ -409,7 +409,7 @@ fn collect_layout_balance_warnings(
 
     if stats
         .deepest_caption_bottom
-        .is_some_and(|bottom| bottom < canvas.rows.saturating_sub(1))
+        .is_some_and(|bottom| bottom < canvas.rows)
     {
         push_contract_warning(
             seen,

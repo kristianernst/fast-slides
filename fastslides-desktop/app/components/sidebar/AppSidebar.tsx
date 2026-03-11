@@ -2,7 +2,6 @@
 
 import { ArrowLeftIcon } from "@radix-ui/react-icons";
 import { BoxMinimalistic } from "@solar-icons/react";
-import { DeckReviewPanel, type ProjectAnalysis } from "../workspace/DeckReviewPanel";
 import { ProjectList } from "./ProjectList";
 import type { SidebarProject } from "./types";
 
@@ -15,15 +14,11 @@ type AppSidebarProps = {
   projects: SidebarProject[];
   pinnedPaths: string[];
   selectedPath: string;
-  deckAnalysis: ProjectAnalysis | null;
-  activeSlideIndex: number;
-  reviewVisible: boolean;
   onBackToApp: () => void;
   onOpenProject: () => void;
   onSelectProject: (path: string) => void;
   onRemoveProject: (path: string) => void;
   onTogglePin: (path: string) => void;
-  onToggleReview: () => void;
   onOpenSettings: () => void;
   onSelectSettingsTab: (tab: "theme" | "library") => void;
 };
@@ -37,15 +32,11 @@ export function AppSidebar({
   projects,
   pinnedPaths,
   selectedPath,
-  deckAnalysis,
-  activeSlideIndex,
-  reviewVisible,
   onBackToApp,
   onOpenProject,
   onSelectProject,
   onRemoveProject,
   onTogglePin,
-  onToggleReview,
   onOpenSettings,
   onSelectSettingsTab,
 }: AppSidebarProps) {
@@ -136,22 +127,9 @@ export function AppSidebar({
               onRemoveProject={onRemoveProject}
               onTogglePin={onTogglePin}
             />
-
-            {reviewVisible && deckAnalysis ? (
-              <DeckReviewPanel analysis={deckAnalysis} activeSlideIndex={activeSlideIndex} />
-            ) : null}
           </section>
 
           <footer className="sidebar-footer">
-            <button
-              type="button"
-              className={`sidebar-footer-link ${reviewVisible ? "is-active" : ""}`}
-              onClick={onToggleReview}
-              aria-pressed={reviewVisible}
-              disabled={interactionsDisabled || !deckAnalysis}
-            >
-              {reviewVisible ? "Hide Review" : "Show Review"}
-            </button>
             <button
               type="button"
               className="sidebar-footer-link"

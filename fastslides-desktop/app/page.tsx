@@ -31,7 +31,6 @@ import { SidebarResizer } from "./components/sidebar/SidebarResizer";
 import { SidebarToggleButton } from "./components/sidebar/SidebarToggleButton";
 import { AssetLightbox } from "./components/overlays/AssetLightbox";
 import { SettingsOverlay } from "./components/settings/SettingsOverlay";
-import { type ProjectAnalysis } from "./components/workspace/DeckReviewPanel";
 import { PreviewWorkspace } from "./components/workspace/PreviewWorkspace";
 
 type ProjectSummary = {
@@ -1503,7 +1502,6 @@ async function pickFolder(title: string): Promise<string> {
 }
 
 const SELECTED_STATE_KEY = "fastslides_selected_path";
-const REVIEW_PANEL_STATE_KEY = "fastslides_review_visible";
 const SIDEBAR_WIDTH_STATE_KEY = "fastslides_sidebar_width";
 const THEME_STATE_KEY = "fastslides_theme";
 const MERMAID_THEME_STATE_KEY = "fastslides_mermaid_theme";
@@ -2999,7 +2997,6 @@ export default function Home() {
   const [appState, setAppState] = useState<AppState | null>(null);
   const [selectedPath, setSelectedPath] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [reviewVisible, setReviewVisible] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [sidebarDragging, setSidebarDragging] = useState(false);
   const [selectedProjectDetail, setSelectedProjectDetail] =
@@ -3012,8 +3009,6 @@ export default function Home() {
     null,
   );
   const [projectSceneError, setProjectSceneError] = useState("");
-  const [projectAnalysis, setProjectAnalysis] =
-    useState<ProjectAnalysis | null>(null);
   const [previewDockVisible, setPreviewDockVisible] = useState(true);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -3112,21 +3107,9 @@ export default function Home() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
-      setReviewVisible(localStorage.getItem(REVIEW_PANEL_STATE_KEY) === "1");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
       localStorage.setItem(SIDEBAR_WIDTH_STATE_KEY, String(sidebarWidth));
     }
   }, [sidebarWidth]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(REVIEW_PANEL_STATE_KEY, reviewVisible ? "1" : "0");
-    }
-  }, [reviewVisible]);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
@@ -3186,19 +3169,11 @@ export default function Home() {
         status: slide.status,
       }));
     }
-    if (projectAnalysis?.outline.length) {
-      return projectAnalysis.outline;
-    }
     return Array.from({ length: visibleSlideCount }, (_, index) => ({
       index,
       title: `Slide ${index + 1}`,
     }));
-  }, [
-    projectAnalysis?.outline,
-    projectScene?.slides,
-    slideOutline,
-    visibleSlideCount,
-  ]);
+  }, [projectScene?.slides, slideOutline, visibleSlideCount]);
 
   const previewStatusLabel = useMemo(() => {
     if (!selectedProject || projectSceneError) {
@@ -3275,7 +3250,6 @@ export default function Home() {
       setSelectedProjectDetail(null);
       setProjectScene(null);
       setProjectSceneError("");
-      setProjectAnalysis(null);
       return;
     }
 
@@ -3506,35 +3480,6 @@ export default function Home() {
         sceneCompilePumpRef.current = null;
         sceneSessionIdRef.current = "";
       }
-    };
-  }, [selectedProject?.path, selectedProjectDetail?.updated_at]);
-
-  useEffect(() => {
-    if (!selectedProject) {
-      setProjectAnalysis(null);
-      return;
-    }
-
-    let cancelled = false;
-    call<ProjectAnalysis>("analyze_project", { path: selectedProject.path })
-      .then((analysis) => {
-        if (!cancelled) {
-          setProjectAnalysis(analysis);
-        }
-      })
-      .catch((cause) => {
-        if (!cancelled) {
-          const message =
-            cause instanceof Error
-              ? cause.message
-              : "Failed to analyze project structure.";
-          console.log(message);
-          setProjectAnalysis(null);
-        }
-      });
-
-    return () => {
-      cancelled = true;
     };
   }, [selectedProject?.path, selectedProjectDetail?.updated_at]);
 
@@ -4296,9 +4241,6 @@ export default function Home() {
         projects={projects}
         pinnedPaths={appState?.config.pinned_projects || []}
         selectedPath={selectedPath}
-        deckAnalysis={projectAnalysis}
-        activeSlideIndex={activeSlideIndex}
-        reviewVisible={reviewVisible}
         onBackToApp={() => setSettingsOpen(false)}
         onOpenProject={() => {
           void handleOpenProjectFolder();
@@ -4309,9 +4251,6 @@ export default function Home() {
         }}
         onTogglePin={(path) => {
           void handleTogglePin(path);
-        }}
-        onToggleReview={() => {
-          setReviewVisible((visible) => !visible);
         }}
         onOpenSettings={() => openSettingsPanel("theme")}
         onSelectSettingsTab={setSettingsTab}

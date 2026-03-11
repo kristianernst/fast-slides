@@ -147,14 +147,14 @@ fn slide_contract_warnings_allow_spacious_scorecard_layout() {
   <Area x={2} y={3} w={30} h={4}>
     <Takeaway>Stable primitives make complex decks easier to review.</Takeaway>
   </Area>
-  <Area x={2} y={9} w={33} h={6}>
+  <Area x={2} y={7} w={33} h={6}>
     <Grid cols={3} gap="sm">
       <Metric label="Grid" value="50x25" hint="Base canvas" />
       <Metric label="QA" value="Live" hint="Preview first" />
       <Metric label="Export" value="Shared" hint="One scene model" />
     </Grid>
   </Area>
-  <Area x={36} y={9} w={12} h={10}>
+  <Area x={36} y={7} w={12} h={10}>
     <Callout title="Check">Short commentary sits cleanly in the rail.</Callout>
   </Area>
 </Canvas>
@@ -171,15 +171,15 @@ fn slide_contract_warnings_flag_late_body_start_and_high_caption() {
   <Area x={2} y={4} w={46} h={4}>
     <Takeaway>Dynamic context should reduce prompt bloat without losing task precision.</Takeaway>
   </Area>
-  <Area x={2} y={10} w={30} h={11}>
+  <Area x={2} y={8} w={30} h={11}>
     <Panel title="Compare">
       Baseline on the left, target on the right, and the operating change in the middle.
     </Panel>
   </Area>
-  <Area x={34} y={10} w={14} h={11}>
+  <Area x={34} y={8} w={14} h={11}>
     <Callout>Explain the one implication the audience should remember.</Callout>
   </Area>
-  <Area x={2} y={23} w={18} h={1}>
+  <Area x={2} y={24} w={18} h={1}>
     <Caption>Source: Operator interviews</Caption>
   </Area>
 </Canvas>
@@ -355,7 +355,7 @@ fn chart_component_is_counted_compiled_and_warning_clean() {
     <Area x={2} y={3} w={46} h={4}>
       <Takeaway>Charts should render through the shared scene model, not raw HTML.</Takeaway>
     </Area>
-    <Area x={2} y={9} w={30} h={13}>
+    <Area x={2} y={7} w={30} h={13}>
       <Chart
         type="bar"
         title="Priority"
@@ -364,7 +364,7 @@ fn chart_component_is_counted_compiled_and_warning_clean() {
         highlight="Workflow"
       />
     </Area>
-    <Area x={34} y={9} w={14} h={13}>
+    <Area x={34} y={7} w={14} h={13}>
       <Callout title="Read-through">One focused chart beats a hand-built box garden.</Callout>
     </Area>
   </Canvas>
