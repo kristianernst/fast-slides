@@ -22,6 +22,9 @@ ATTR_LINK_RE = re.compile(r"(?:src|href|poster)\s*=\s*[\"']([^\"']+)[\"']")
 WORD_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9'./-]*")
 IMPORT_EXPORT_RE = re.compile(r"^\s*(import|export)\s+", re.MULTILINE)
 USE_CLIENT_RE = re.compile(r"^\s*[\"']use client[\"']\s*;?\s*$", re.MULTILINE)
+LEGACY_SPLIT_RE = re.compile(r'className\s*=\s*["\'][^"\']*\bsplit\b[^"\']*["\']')
+CANVAS_RE = re.compile(r"<Canvas\b")
+AREA_RE = re.compile(r"<Area\b")
 
 EXTERNAL_PREFIXES = (
     "http://",
@@ -237,6 +240,15 @@ def main() -> int:
         bullets = bullet_count(slide)
         paragraph_words = max_paragraph_words(slide)
         slide_stats.append({"slide": index, "words": words, "bullets": bullets, "max_paragraph_words": paragraph_words})
+
+        if not CANVAS_RE.search(slide) or not AREA_RE.search(slide):
+            errors.append(
+                f"Slide {index} must use the 2.0 spatial layout contract (`Canvas` with `Area` regions)."
+            )
+        if LEGACY_SPLIT_RE.search(slide):
+            errors.append(
+                f"Slide {index} uses legacy `split` layout. Replace it with `Canvas` and `Area`."
+            )
 
         if words > args.max_words:
             warnings.append(f"Slide {index} has {words} words (threshold: {args.max_words}).")

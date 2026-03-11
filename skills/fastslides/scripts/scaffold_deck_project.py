@@ -11,10 +11,41 @@ from pathlib import Path
 from path_utils import default_projects_dir as detect_default_projects_dir
 
 PROJECT_NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+DEFAULT_SLIDES_CSS = """:root {
+  --slide-bg: #f5f1e8;
+  --slide-border: rgba(30, 42, 56, 0.1);
+  --slide-radius: 14px;
+  --slide-padding: 36px;
+  --slide-layout-gap: 18px;
+  --slide-card-bg: rgba(255, 255, 255, 0.72);
+  --slide-card-border: rgba(30, 42, 56, 0.1);
+  --slide-card-radius: 12px;
+  --slide-card-padding: 16px;
+  --slide-font-family: "IBM Plex Sans", "Inter", system-ui, sans-serif;
+  --slide-heading-font: "Iowan Old Style", "Georgia", serif;
+  --slide-code-font: "Fira Code", monospace;
+  --slide-meta-font: var(--slide-code-font);
+  --slide-meta-size: 0.72rem;
+  --slide-fg: #16212b;
+  --slide-h1-color: #13202c;
+  --slide-h2-color: #223446;
+  --slide-h3-color: #395166;
+  --slide-body-color: #425467;
+  --slide-meta-color: rgba(66, 84, 103, 0.82);
+  --slide-accent: #1f7a78;
+  --slide-link-color: var(--slide-accent);
+  --slide-code-bg: rgba(23, 32, 43, 0.06);
+  --slide-palette-1: #1f7a78;
+  --slide-palette-2: #739e82;
+  --slide-palette-3: #d7a65d;
+  --slide-palette-4: #ba6b6f;
+  --slide-palette-5: #5973a9;
+}
+"""
 
 
 def default_projects_dir() -> Path:
-    return detect_default_projects_dir(__file__)
+    return detect_default_projects_dir()
 
 
 def yaml_quote(value: str) -> str:
@@ -37,62 +68,116 @@ def build_template(project: str, title: str, subtitle: str, date_label: str) -> 
     return frontmatter + f'''<main className="deck">
 
 <section className="slide">
+  <Canvas cols={{50}} rows={{25}} gap="1px">
+    <Area x={{2}} y={{2}} w={{14}} h={{1}}>
+      <Kicker>{project}</Kicker>
+    </Area>
 
-# {title}
+    <Area x={{2}} y={{4}} w={{46}} h={{4}}>
+      <Takeaway>{title}</Takeaway>
+    </Area>
 
-<div className="flex flex-col h-full justify-center">
-  <div className="text-6xl font-extrabold text-neutral-900 mb-6">{subtitle}</div>
-  <div className="text-2xl text-neutral-500">{date_label}</div>
-</div>
+    <Area x={{2}} y={{9}} w={{18}} h={{2}}>
+      <p>{subtitle}</p>
+    </Area>
 
+    <Area x={{2}} y={{12}} w={{22}} h={{2}}>
+      <PillRow>
+        <Pill>50 x 25 grid</Pill>
+        <Pill>spatial pages</Pill>
+        <Pill>typed review</Pill>
+      </PillRow>
+    </Area>
+
+    <Area x={{34}} y={{10}} w={{14}} h={{11}}>
+      <Callout title="How to start" tone="accent">
+        Use one takeaway, two to four regions, and explicit evidence blocks instead of ad hoc layout HTML.
+      </Callout>
+    </Area>
+
+    <Area x={{2}} y={{23}} w={{12}} h={{1}}>
+      <Caption>{date_label}</Caption>
+    </Area>
+  </Canvas>
 </section>
 
 <section className="slide">
+  <Canvas cols={{50}} rows={{25}} gap="1px">
+    <Area x={{2}} y={{2}} w={{16}} h={{1}}>
+      <Kicker>Situation</Kicker>
+    </Area>
 
-# Problem
+    <Area x={{2}} y={{4}} w={{46}} h={{4}}>
+      <Takeaway>Move every deck onto a spatial canvas so agents edit structure, not fragile layout markup.</Takeaway>
+    </Area>
 
-<div className="split">
-  <div className="col prose-compact">
+    <Area x={{2}} y={{9}} w={{14}} h={{12}}>
+      <Panel title="Problem" tone="accent">
+        <ul>
+          <li>Legacy layout markup drifts slide by slide.</li>
+          <li>Review catches issues late.</li>
+          <li>Local edits often break composition.</li>
+        </ul>
+      </Panel>
+    </Area>
 
-  - Current process is fragmented across inboxes and handoffs.
-  - Ownership is unclear for time-sensitive messages.
-  - Manual triage creates delays and rework.
+    <Area x={{18}} y={{9}} w={{14}} h={{12}}>
+      <Panel title="2.0 model">
+        <ul>
+          <li>Canvas defines page geometry.</li>
+          <li>Area defines regions.</li>
+          <li>Panels and callouts define content structure.</li>
+        </ul>
+      </Panel>
+    </Area>
 
-  </div>
-  <div className="col prose-compact">
-
-  - Delays reduce responsiveness and predictability.
-  - Teams spend time coordinating instead of resolving.
-  - Leadership lacks a clear operational signal.
-
-  </div>
-</div>
-
+    <Area x={{34}} y={{9}} w={{14}} h={{12}}>
+      <Panel title="Outcome">
+        <ul>
+          <li>Cleaner decks by default.</li>
+          <li>More stable review and export.</li>
+          <li>A path to a shared scene renderer.</li>
+        </ul>
+      </Panel>
+    </Area>
+  </Canvas>
 </section>
 
 <section className="slide">
+  <Canvas cols={{50}} rows={{25}} gap="1px">
+    <Area x={{2}} y={{2}} w={{18}} h={{1}}>
+      <Kicker>Starter kit</Kicker>
+    </Area>
 
-# Proposal
+    <Area x={{2}} y={{4}} w={{46}} h={{4}}>
+      <Takeaway>Every new project should start from reusable page patterns, not from a blank DOM tree.</Takeaway>
+    </Area>
 
-<div className="split">
-  <div className="col prose-compact">
+    <Area x={{2}} y={{9}} w={{18}} h={{12}}>
+      <Panel title="Recommended flow" tone="accent">
+        <ol>
+          <li>Write the takeaway first.</li>
+          <li>Place 2 to 4 regions.</li>
+          <li>Add one evidence pattern.</li>
+          <li>Validate and snapshot before hand-off.</li>
+        </ol>
+      </Panel>
+    </Area>
 
-  1. Classify incoming messages by intent and urgency.
-  2. Route each message to a clear owner.
-  3. Track response timing and outcomes.
+    <Area x={{22}} y={{9}} w={{10}} h={{5}}>
+      <Metric label="Grid" value="50 x 25" hint="Default authoring canvas" />
+    </Area>
 
-  </div>
-  <div className="col prose-compact">
+    <Area x={{22}} y={{15}} w={{10}} h={{5}}>
+      <Metric label="Review" value="Sidebar toggle" hint="Off by default" />
+    </Area>
 
-  ## Expected Outcome
-
-  - Faster first response
-  - Lower coordination overhead
-  - Better visibility for management decisions
-
-  </div>
-</div>
-
+    <Area x={{34}} y={{9}} w={{14}} h={{12}}>
+      <Callout title="Next step">
+        Keep the slide contract stable so preview and export can move onto the same scene graph.
+      </Callout>
+    </Area>
+  </Canvas>
 </section>
 
 </main>
@@ -147,9 +232,11 @@ def main() -> int:
         build_template(project_key, args.title, args.subtitle, args.date_label),
         encoding="utf-8",
     )
+    (project_dir / "slides.css").write_text(DEFAULT_SLIDES_CSS, encoding="utf-8")
 
     print(f"[OK] Project scaffold ready: {project_dir}")
     print(f"[OK] Wrote: {page_path}")
+    print(f"[OK] Wrote: {project_dir / 'slides.css'}")
     print("[OK] Ensured asset dirs: images/, media/, data/")
     return 0
 

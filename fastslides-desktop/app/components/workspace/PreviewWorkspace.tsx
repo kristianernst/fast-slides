@@ -20,6 +20,7 @@ type PreviewWorkspaceProps = {
   slideTocEntries: SlideTocEntry[];
   activeSlideIndex: number;
   onTocSelect: (index: number) => void;
+  previewStatusLabel: string;
   previewDockVisible: boolean;
   onPreviewDockPointerEnter: () => void;
   onPreviewDockPointerLeave: () => void;
@@ -38,6 +39,7 @@ export function PreviewWorkspace({
   slideTocEntries,
   activeSlideIndex,
   onTocSelect,
+  previewStatusLabel,
   previewDockVisible,
   onPreviewDockPointerEnter,
   onPreviewDockPointerLeave,
@@ -46,7 +48,10 @@ export function PreviewWorkspace({
   onPreviewStagePointerLeave,
 }: PreviewWorkspaceProps) {
   return (
-    <section className="workspace" aria-label={settingsOpen ? "Settings area" : "Preview area"}>
+    <section
+      className="workspace"
+      aria-label={settingsOpen ? "Settings area" : "Preview area"}
+    >
       {hasSelectedProject ? (
         <div
           className={`preview-stage ${presenterMode ? "presenter-mode single-slide-mode" : "list-slide-mode"}`}
@@ -58,6 +63,12 @@ export function PreviewWorkspace({
               {deckPreview}
             </div>
           </div>
+
+          {previewStatusLabel ? (
+            <div className="preview-progress-chip" aria-live="polite">
+              {previewStatusLabel}
+            </div>
+          ) : null}
 
           <SlideTocRail
             entries={slideTocEntries}

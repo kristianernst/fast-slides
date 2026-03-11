@@ -1,21 +1,21 @@
 "use client";
 
 import {
-  Children,
-  isValidElement,
+  createContext,
+  startTransition,
+  useContext,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ComponentType,
   type CSSProperties,
   type HTMLAttributes,
   type ImgHTMLAttributes,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  type VideoHTMLAttributes,
 } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import * as jsxRuntime from "react/jsx-runtime";
 import { THEMES, renderMermaid } from "beautiful-mermaid";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import {
@@ -61,9 +61,264 @@ type AppState = {
   projects: ProjectSummary[];
 };
 
+type SettingsTab = "theme" | "library";
+
+type ComponentCatalogEntry = {
+  name: string;
+  family: string;
+  kind: string;
+  scope: string;
+  summary: string;
+  tags: string[];
+};
+
+type ComponentCatalog = {
+  version: string;
+  items: ComponentCatalogEntry[];
+};
+
+type DesignTemplate = {
+  kind: string;
+  name: string;
+  mdx: string;
+  notes: string[];
+};
+
+type ProjectScene = {
+  path: string;
+  project: string | null;
+  title: string | null;
+  subtitle: string | null;
+  date: string | null;
+  deck_class_name: string | null;
+  slide_count: number;
+  slides: SceneSlide[];
+};
+
+type SceneSlide = {
+  index: number;
+  title: string;
+  layout: SceneLayout;
+  nodes: SceneNode[];
+  source_mdx: string;
+};
+
+type SceneSlideManifest = {
+  index: number;
+  title: string;
+  layout: SceneLayout;
+};
+
+type ProjectSceneManifest = Omit<ProjectScene, "slides"> & {
+  slides: SceneSlideManifest[];
+};
+
+type SceneLayout = {
+  kind: string;
+  cols: number | null;
+  rows: number | null;
+  gap: string | null;
+};
+
+type SceneSlideLoadStatus = "loading" | "ready" | "error";
+
+type PreviewSceneSlide = SceneSlideManifest & {
+  nodes: SceneNode[];
+  source_mdx: string;
+  status: SceneSlideLoadStatus;
+  error: string | null;
+};
+
+type PreviewProjectScene = Omit<ProjectScene, "slides"> & {
+  slides: PreviewSceneSlide[];
+};
+
+type ProjectSceneSessionHandle = {
+  session_id: string;
+  path: string;
+  slide_count: number;
+};
+
+type ProjectSceneSessionEvent =
+  | {
+      session_id: string;
+      sequence: number;
+      kind: "manifest";
+      scene: ProjectSceneManifest;
+    }
+  | {
+      session_id: string;
+      sequence: number;
+      kind: "slide-ready";
+      slide: SceneSlide;
+    }
+  | {
+      session_id: string;
+      sequence: number;
+      kind: "slide-error";
+      index: number;
+      error: string;
+    }
+  | {
+      session_id: string;
+      sequence: number;
+      kind: "complete";
+      ready_count: number;
+      error_count: number;
+    };
+
+type SceneCanvasNode = {
+  kind: "canvas";
+  cols: number;
+  rows: number;
+  gap: string | null;
+  class_name: string | null;
+  children: SceneNode[];
+  source_mdx: string;
+};
+
+type SceneAreaNode = {
+  kind: "area";
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  layer: number | null;
+  gap: string | null;
+  align: string | null;
+  justify: string | null;
+  class_name: string | null;
+  children: SceneNode[];
+  source_mdx: string;
+};
+
+type SceneLayoutGroupNode = {
+  kind: "layout-group";
+  component: string;
+  cols: number | null;
+  gap: string | null;
+  align: string | null;
+  justify: string | null;
+  nowrap: boolean | null;
+  class_name: string | null;
+  children: SceneNode[];
+  source_mdx: string;
+};
+
+type SceneSurfaceNode = {
+  kind: "surface";
+  component: string;
+  tone: string | null;
+  title: string | null;
+  kicker: string | null;
+  subtitle: string | null;
+  foot: string | null;
+  attribution: string | null;
+  class_name: string | null;
+  children: SceneNode[];
+  source_mdx: string;
+};
+
+type SceneMetricNode = {
+  kind: "metric";
+  label: string | null;
+  value: string | null;
+  hint: string | null;
+  class_name: string | null;
+  source_mdx: string;
+};
+
+type SceneChartDatum = {
+  label: string;
+  value: number;
+};
+
+type SceneChartNode = {
+  kind: "chart";
+  chart_type: string;
+  title: string | null;
+  tone: string | null;
+  value_suffix: string | null;
+  highlight: string | null;
+  data: SceneChartDatum[];
+  class_name: string | null;
+  source_mdx: string;
+};
+
+type SceneTextNode = {
+  kind: "text";
+  role: string;
+  text: string;
+  level: number | null;
+  class_name: string | null;
+};
+
+type SceneListNode = {
+  kind: "list";
+  ordered: boolean;
+  items: string[];
+};
+
+type SceneMediaNode = {
+  kind: "media";
+  media_kind: string;
+  src: string;
+  alt: string | null;
+};
+
+type SceneCodeBlockNode = {
+  kind: "code-block";
+  language: string | null;
+  code: string;
+};
+
+type ScenePillNode = {
+  kind: "pill";
+  tone: string | null;
+  text: string;
+  class_name: string | null;
+};
+
+type SceneRuleNode = {
+  kind: "rule";
+  class_name: string | null;
+};
+
+type SceneArrowNode = {
+  kind: "arrow";
+  direction: string | null;
+  tone: string | null;
+  label: string | null;
+  class_name: string | null;
+  source_mdx: string;
+};
+
+type SceneRawNode = {
+  kind: "raw";
+  format: string;
+  text: string;
+};
+
+type SceneNode =
+  | SceneCanvasNode
+  | SceneAreaNode
+  | SceneLayoutGroupNode
+  | SceneSurfaceNode
+  | SceneMetricNode
+  | SceneChartNode
+  | SceneTextNode
+  | SceneListNode
+  | SceneMediaNode
+  | SceneCodeBlockNode
+  | ScenePillNode
+  | SceneRuleNode
+  | SceneArrowNode
+  | SceneRawNode;
+
 type SlideOutlineEntry = {
   index: number;
   title: string;
+  status?: SceneSlideLoadStatus;
 };
 
 type ExpandableAsset = {
@@ -90,7 +345,11 @@ function normalizeLayoutGap(value: unknown): LayoutGapScale {
     return "md";
   }
   const normalized = value.trim().toLowerCase();
-  if ((Object.keys(LAYOUT_GAP_MULTIPLIER) as LayoutGapScale[]).includes(normalized as LayoutGapScale)) {
+  if (
+    (Object.keys(LAYOUT_GAP_MULTIPLIER) as LayoutGapScale[]).includes(
+      normalized as LayoutGapScale,
+    )
+  ) {
     return normalized as LayoutGapScale;
   }
   return "md";
@@ -101,7 +360,12 @@ function normalizeLayoutAlign(value: unknown): LayoutAlign {
     return "stretch";
   }
   const normalized = value.trim().toLowerCase();
-  if (normalized === "start" || normalized === "center" || normalized === "end" || normalized === "stretch") {
+  if (
+    normalized === "start" ||
+    normalized === "center" ||
+    normalized === "end" ||
+    normalized === "stretch"
+  ) {
     return normalized;
   }
   return "stretch";
@@ -112,22 +376,27 @@ function normalizeLayoutJustify(value: unknown): LayoutJustify {
     return "start";
   }
   const normalized = value.trim().toLowerCase();
-  if (normalized === "start" || normalized === "center" || normalized === "end" || normalized === "between") {
+  if (
+    normalized === "start" ||
+    normalized === "center" ||
+    normalized === "end" ||
+    normalized === "between"
+  ) {
     return normalized;
   }
   return "start";
 }
 
-function normalizeGridColumns(value: unknown): 1 | 2 | 3 {
+function normalizeGridColumns(value: unknown): 1 | 2 | 3 | 4 {
   if (typeof value === "number") {
-    if (value === 1 || value === 2 || value === 3) {
+    if (value === 1 || value === 2 || value === 3 || value === 4) {
       return value;
     }
     return 2;
   }
   if (typeof value === "string") {
     const parsed = Number.parseInt(value, 10);
-    if (parsed === 1 || parsed === 2 || parsed === 3) {
+    if (parsed === 1 || parsed === 2 || parsed === 3 || parsed === 4) {
       return parsed;
     }
   }
@@ -139,15 +408,55 @@ function normalizeCardTone(value: unknown): CardTone {
     return "default";
   }
   const normalized = value.trim().toLowerCase();
-  if (normalized === "default" || normalized === "accent" || normalized === "success" || normalized === "warning" || normalized === "danger") {
+  if (
+    normalized === "default" ||
+    normalized === "accent" ||
+    normalized === "success" ||
+    normalized === "warning" ||
+    normalized === "danger"
+  ) {
     return normalized;
   }
   return "default";
 }
 
 function layoutGapCssValue(gap: unknown): string {
+  if (typeof gap === "number" && Number.isFinite(gap) && gap >= 0) {
+    return `${gap}px`;
+  }
+  if (typeof gap === "string") {
+    const trimmed = gap.trim();
+    if (trimmed.length > 0) {
+      if (
+        (Object.keys(LAYOUT_GAP_MULTIPLIER) as LayoutGapScale[]).includes(
+          trimmed as LayoutGapScale,
+        )
+      ) {
+        return `calc(var(--slide-layout-gap, 16px) * ${LAYOUT_GAP_MULTIPLIER[trimmed as LayoutGapScale]})`;
+      }
+      return trimmed;
+    }
+  }
   const normalized = normalizeLayoutGap(gap);
   return `calc(var(--slide-layout-gap, 16px) * ${LAYOUT_GAP_MULTIPLIER[normalized]})`;
+}
+
+function normalizePositiveInt(
+  value: unknown,
+  fallback: number,
+  min = 1,
+  max = 100,
+): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.min(max, Math.max(min, Math.round(value)));
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isFinite(parsed)) {
+      return Math.min(max, Math.max(min, parsed));
+    }
+  }
+  return fallback;
 }
 
 function layoutAlignCssValue(align: unknown): CSSProperties["alignItems"] {
@@ -158,12 +467,146 @@ function layoutAlignCssValue(align: unknown): CSSProperties["alignItems"] {
   return "stretch";
 }
 
-function layoutJustifyCssValue(justify: unknown): CSSProperties["justifyContent"] {
+function layoutJustifyCssValue(
+  justify: unknown,
+): CSSProperties["justifyContent"] {
   const normalized = normalizeLayoutJustify(justify);
   if (normalized === "start") return "flex-start";
   if (normalized === "end") return "flex-end";
   if (normalized === "center") return "center";
   return "space-between";
+}
+
+type AreaShape = "hero" | "banner" | "rail" | "panel" | "tile";
+type AreaDensity = "tight" | "balanced" | "roomy";
+type MetricVariant = "compact" | "standard" | "feature";
+type CalloutVariant = "compact" | "rail" | "standard";
+type TakeawayScale = "compact" | "balanced" | "hero";
+type PanelVariant = "compact" | "standard" | "roomy";
+
+type LayoutScope = {
+  canvasCols: number;
+  canvasRows: number;
+  areaCols: number | null;
+  areaRows: number | null;
+  areaShape: AreaShape;
+  areaDensity: AreaDensity;
+  gridCols: number | null;
+};
+
+const DEFAULT_LAYOUT_SCOPE: LayoutScope = {
+  canvasCols: 50,
+  canvasRows: 25,
+  areaCols: null,
+  areaRows: null,
+  areaShape: "panel",
+  areaDensity: "balanced",
+  gridCols: null,
+};
+
+const LayoutScopeContext = createContext<LayoutScope>(DEFAULT_LAYOUT_SCOPE);
+
+function inferAreaShape(cols: number, rows: number): AreaShape {
+  if (cols >= 28 && rows <= 6) {
+    return "hero";
+  }
+  if (cols >= 20 && rows <= 4) {
+    return "banner";
+  }
+  if (cols <= 15 && rows >= 8) {
+    return "rail";
+  }
+  if (cols <= 12 && rows <= 6) {
+    return "tile";
+  }
+  return "panel";
+}
+
+function inferAreaDensity(cols: number, rows: number): AreaDensity {
+  const footprint = cols * rows;
+  if (footprint <= 70) {
+    return "tight";
+  }
+  if (footprint >= 150) {
+    return "roomy";
+  }
+  return "balanced";
+}
+
+function inferTakeawayScale(
+  scope: LayoutScope,
+  textLength: number,
+): TakeawayScale {
+  const areaCols = scope.areaCols ?? 30;
+  const areaRows = scope.areaRows ?? 5;
+  if (
+    scope.areaShape === "banner" ||
+    areaRows <= 4 ||
+    (areaCols <= 30 && textLength >= 90)
+  ) {
+    return "compact";
+  }
+  if (scope.areaShape === "hero" && areaCols >= 30 && textLength <= 72) {
+    return "hero";
+  }
+  return "balanced";
+}
+
+function inferMetricVariant(
+  scope: LayoutScope,
+  valueLength: number,
+  hintLength: number,
+): MetricVariant {
+  const areaCols = scope.areaCols ?? 10;
+  const areaRows = scope.areaRows ?? 5;
+  const gridCols = scope.gridCols ?? 1;
+  if (
+    gridCols >= 3 ||
+    areaCols <= 10 ||
+    areaRows <= 5 ||
+    valueLength >= 9 ||
+    hintLength > 22
+  ) {
+    return "compact";
+  }
+  if (areaCols >= 12 && areaRows >= 6 && valueLength <= 7) {
+    return "feature";
+  }
+  return "standard";
+}
+
+function inferCalloutVariant(
+  scope: LayoutScope,
+  bodyLength: number,
+): CalloutVariant {
+  const areaCols = scope.areaCols ?? 14;
+  const areaRows = scope.areaRows ?? 10;
+  if (areaCols <= 13 || areaRows <= 9 || bodyLength >= 120) {
+    return "compact";
+  }
+  if (scope.areaShape === "rail" || areaCols <= 15) {
+    return "rail";
+  }
+  return "standard";
+}
+
+function inferPanelVariant(
+  scope: LayoutScope,
+  bodyLength: number,
+): PanelVariant {
+  const areaCols = scope.areaCols ?? 18;
+  const areaRows = scope.areaRows ?? 11;
+  if (areaCols <= 20 || areaRows <= 11 || bodyLength >= 120) {
+    return "compact";
+  }
+  if (areaCols >= 24 && areaRows >= 12 && bodyLength <= 88) {
+    return "roomy";
+  }
+  return "standard";
+}
+
+function useLayoutScope(): LayoutScope {
+  return useContext(LayoutScopeContext);
 }
 
 type MdxLayoutProps = HTMLAttributes<HTMLDivElement> & {
@@ -235,7 +678,7 @@ function MdxRow({
 }
 
 type MdxGridProps = HTMLAttributes<HTMLDivElement> & {
-  cols?: 1 | 2 | 3 | string | number;
+  cols?: 1 | 2 | 3 | 4 | string | number;
   gap?: LayoutGapScale | string;
   align?: LayoutAlign | string;
 };
@@ -249,23 +692,256 @@ function MdxGrid({
   align = "stretch",
   ...props
 }: MdxGridProps) {
+  const parentScope = useLayoutScope();
   const normalizedCols = normalizeGridColumns(cols);
+  const density: AreaDensity =
+    normalizedCols >= 3 && (parentScope.areaCols ?? 0) <= 32
+      ? "tight"
+      : "balanced";
+  const scope = useMemo(
+    () => ({
+      ...parentScope,
+      gridCols: normalizedCols,
+    }),
+    [parentScope, normalizedCols],
+  );
+  return (
+    <LayoutScopeContext.Provider value={scope}>
+      <div
+        {...props}
+        className={["mdx-grid", className].filter(Boolean).join(" ")}
+        data-cols={normalizedCols}
+        data-density={density}
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${normalizedCols}, minmax(0, 1fr))`,
+          minWidth: 0,
+          gap: layoutGapCssValue(gap),
+          alignItems: layoutAlignCssValue(align),
+          ...style,
+        }}
+      >
+        {children}
+      </div>
+    </LayoutScopeContext.Provider>
+  );
+}
+
+type MdxCanvasProps = HTMLAttributes<HTMLDivElement> & {
+  cols?: number | string;
+  rows?: number | string;
+  gap?: LayoutGapScale | string | number;
+};
+
+function MdxCanvas({
+  children,
+  className,
+  style,
+  cols = 50,
+  rows = 25,
+  gap = "1px",
+  ...props
+}: MdxCanvasProps) {
+  const normalizedCols = normalizePositiveInt(cols, 50, 1, 100);
+  const normalizedRows = normalizePositiveInt(rows, 25, 1, 100);
+  const scope = useMemo(
+    () => ({
+      ...DEFAULT_LAYOUT_SCOPE,
+      canvasCols: normalizedCols,
+      canvasRows: normalizedRows,
+    }),
+    [normalizedCols, normalizedRows],
+  );
+
+  return (
+    <LayoutScopeContext.Provider value={scope}>
+      <div
+        {...props}
+        className={["mdx-canvas", className].filter(Boolean).join(" ")}
+        data-cols={normalizedCols}
+        data-rows={normalizedRows}
+        style={{
+          display: "grid",
+          gridTemplateColumns: `repeat(${normalizedCols}, minmax(0, 1fr))`,
+          gridTemplateRows: `repeat(${normalizedRows}, minmax(0, 1fr))`,
+          minWidth: 0,
+          minHeight: 0,
+          width: "100%",
+          height: "100%",
+          flex: "1 1 0%",
+          gap: layoutGapCssValue(gap),
+          ...style,
+        }}
+      >
+        {children}
+      </div>
+    </LayoutScopeContext.Provider>
+  );
+}
+
+type MdxAreaProps = HTMLAttributes<HTMLDivElement> & {
+  x?: number | string;
+  y?: number | string;
+  w?: number | string;
+  h?: number | string;
+  layer?: number | string;
+  gap?: LayoutGapScale | string | number;
+  align?: LayoutAlign | string;
+  justify?: LayoutJustify | string;
+};
+
+function MdxArea({
+  children,
+  className,
+  style,
+  x = 1,
+  y = 1,
+  w = 1,
+  h = 1,
+  layer = 1,
+  gap = "md",
+  align = "stretch",
+  justify = "start",
+  ...props
+}: MdxAreaProps) {
+  const parentScope = useLayoutScope();
+  const startColumn = normalizePositiveInt(x, 1, 1, 100);
+  const startRow = normalizePositiveInt(y, 1, 1, 100);
+  const spanColumns = normalizePositiveInt(w, 1, 1, 100);
+  const spanRows = normalizePositiveInt(h, 1, 1, 100);
+  const zIndex = normalizePositiveInt(layer, 1, 1, 10);
+  const areaShape = inferAreaShape(spanColumns, spanRows);
+  const areaDensity = inferAreaDensity(spanColumns, spanRows);
+  const areaStyle: CSSProperties = {
+    gridColumn: `${startColumn} / span ${spanColumns}`,
+    gridRow: `${startRow} / span ${spanRows}`,
+    minWidth: 0,
+    minHeight: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: layoutGapCssValue(gap),
+    alignItems: layoutAlignCssValue(align),
+    justifyContent: layoutJustifyCssValue(justify),
+    zIndex,
+    ...style,
+  };
+  const areaStyleWithVars = areaStyle as CSSProperties & Record<string, string>;
+  areaStyleWithVars["--fs-area-cols"] = String(spanColumns);
+  areaStyleWithVars["--fs-area-rows"] = String(spanRows);
+  const scope = useMemo(
+    () => ({
+      ...parentScope,
+      areaCols: spanColumns,
+      areaRows: spanRows,
+      areaShape,
+      areaDensity,
+      gridCols: null,
+    }),
+    [parentScope, spanColumns, spanRows, areaShape, areaDensity],
+  );
+
+  return (
+    <LayoutScopeContext.Provider value={scope}>
+      <div
+        {...props}
+        className={["mdx-area", className].filter(Boolean).join(" ")}
+        data-area-shape={areaShape}
+        data-area-density={areaDensity}
+        data-area-cols={spanColumns}
+        data-area-rows={spanRows}
+        style={areaStyleWithVars}
+      >
+        {children}
+      </div>
+    </LayoutScopeContext.Provider>
+  );
+}
+
+function cssLengthValue(
+  value: string | number | undefined,
+): string | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return `${value}px`;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    return value.trim();
+  }
+  return undefined;
+}
+
+function formatChartValue(value: number, suffix?: string | null): string {
+  const rounded =
+    Math.abs(value % 1) < 0.001
+      ? String(Math.round(value))
+      : value.toFixed(Math.abs(value) >= 10 ? 0 : 1).replace(/\.0$/, "");
+  return `${rounded}${suffix ?? ""}`;
+}
+
+function chartColorForTone(
+  tone: CardTone,
+  index: number,
+  highlighted: boolean,
+): string {
+  if (highlighted) {
+    if (tone === "success")
+      return "var(--slide-palette-2, var(--slide-accent, #7b9cbc))";
+    if (tone === "warning")
+      return "var(--slide-palette-3, var(--slide-accent, #7b9cbc))";
+    if (tone === "danger")
+      return "var(--slide-palette-4, var(--slide-accent, #7b9cbc))";
+    return "var(--slide-accent, var(--slide-palette-1, #7b9cbc))";
+  }
+  const paletteIndex = (index % 5) + 1;
+  return `var(--slide-palette-${paletteIndex}, var(--slide-accent, #7b9cbc))`;
+}
+
+function MdxKicker({
+  children,
+  className,
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       {...props}
-      className={["mdx-grid", className].filter(Boolean).join(" ")}
-      data-cols={normalizedCols}
+      className={["mdx-kicker", className].filter(Boolean).join(" ")}
+    >
+      {children}
+    </div>
+  );
+}
+
+type TakeawayTag = "h1" | "h2" | "h3";
+
+type MdxTakeawayProps = HTMLAttributes<HTMLHeadingElement> & {
+  as?: TakeawayTag;
+  maxWidth?: string | number;
+  textLength?: number;
+};
+
+function MdxTakeaway({
+  children,
+  className,
+  style,
+  as = "h1",
+  maxWidth,
+  textLength,
+  ...props
+}: MdxTakeawayProps) {
+  const layoutScope = useLayoutScope();
+  const scale = inferTakeawayScale(layoutScope, textLength ?? 0);
+  const Tag = as;
+  return (
+    <Tag
+      {...props}
+      className={["mdx-takeaway", className].filter(Boolean).join(" ")}
+      data-scale={scale}
       style={{
-        display: "grid",
-        gridTemplateColumns: `repeat(${normalizedCols}, minmax(0, 1fr))`,
-        minWidth: 0,
-        gap: layoutGapCssValue(gap),
-        alignItems: layoutAlignCssValue(align),
+        maxWidth: cssLengthValue(maxWidth),
         ...style,
       }}
     >
       {children}
-    </div>
+    </Tag>
   );
 }
 
@@ -287,12 +963,95 @@ function MdxCard({
   return (
     <article
       {...props}
-      className={["mdx-card", `mdx-card--${normalizedTone}`, className].filter(Boolean).join(" ")}
+      className={["mdx-card", `mdx-card--${normalizedTone}`, className]
+        .filter(Boolean)
+        .join(" ")}
     >
       {title ? <h3 className="mdx-card-title">{title}</h3> : null}
-      {subtitle ? <p className="mdx-caption mdx-card-subtitle">{subtitle}</p> : null}
+      {subtitle ? (
+        <p className="mdx-caption mdx-card-subtitle">{subtitle}</p>
+      ) : null}
       <div className="mdx-card-body">{children}</div>
     </article>
+  );
+}
+
+type MdxPanelProps = HTMLAttributes<HTMLDivElement> & {
+  kicker?: ReactNode;
+  title?: ReactNode;
+  subtitle?: ReactNode;
+  foot?: ReactNode;
+  tone?: CardTone | string;
+  bodyLength?: number;
+};
+
+function MdxPanel({
+  children,
+  className,
+  kicker,
+  title,
+  subtitle,
+  foot,
+  tone = "default",
+  bodyLength = 0,
+  ...props
+}: MdxPanelProps) {
+  const layoutScope = useLayoutScope();
+  const variant = inferPanelVariant(layoutScope, bodyLength);
+  const normalizedTone = normalizeCardTone(tone);
+  return (
+    <section
+      {...props}
+      className={["mdx-panel", `mdx-panel--${normalizedTone}`, className]
+        .filter(Boolean)
+        .join(" ")}
+      data-variant={variant}
+      data-area-shape={layoutScope.areaShape}
+      data-area-density={layoutScope.areaDensity}
+    >
+      {kicker || title || subtitle ? (
+        <div className="mdx-panel-head">
+          {kicker ? <div className="mdx-kicker">{kicker}</div> : null}
+          {title ? <h3 className="mdx-panel-title">{title}</h3> : null}
+          {subtitle ? <p className="mdx-panel-subtitle">{subtitle}</p> : null}
+        </div>
+      ) : null}
+      <div className="mdx-panel-body">{children}</div>
+      {foot ? <div className="mdx-panel-foot">{foot}</div> : null}
+    </section>
+  );
+}
+
+type MdxCalloutProps = HTMLAttributes<HTMLDivElement> & {
+  title?: ReactNode;
+  tone?: CardTone | string;
+  bodyLength?: number;
+};
+
+function MdxCallout({
+  children,
+  className,
+  title,
+  tone = "default",
+  bodyLength = 0,
+  ...props
+}: MdxCalloutProps) {
+  const layoutScope = useLayoutScope();
+  const variant = inferCalloutVariant(layoutScope, bodyLength);
+  const normalizedTone = normalizeCardTone(tone);
+  return (
+    <aside
+      {...props}
+      className={["mdx-callout", `mdx-callout--${normalizedTone}`, className]
+        .filter(Boolean)
+        .join(" ")}
+      data-variant={variant}
+      data-area-shape={layoutScope.areaShape}
+      data-area-density={layoutScope.areaDensity}
+    >
+      {title ? <div className="mdx-callout-title">{title}</div> : null}
+      <div className="mdx-callout-body">{children}</div>
+    </aside>
   );
 }
 
@@ -300,6 +1059,8 @@ type MdxMetricProps = HTMLAttributes<HTMLDivElement> & {
   label?: ReactNode;
   value?: ReactNode;
   hint?: ReactNode;
+  valueLength?: number;
+  hintLength?: number;
 };
 
 function MdxMetric({
@@ -308,14 +1069,231 @@ function MdxMetric({
   value,
   hint,
   children,
+  valueLength = 0,
+  hintLength = 0,
   ...props
 }: MdxMetricProps) {
+  const layoutScope = useLayoutScope();
+  const variant = inferMetricVariant(layoutScope, valueLength, hintLength);
   return (
-    <article {...props} className={["mdx-metric", className].filter(Boolean).join(" ")}>
+    <article
+      {...props}
+      className={["mdx-metric", className].filter(Boolean).join(" ")}
+      data-variant={variant}
+      data-area-shape={layoutScope.areaShape}
+      data-area-density={layoutScope.areaDensity}
+    >
       {label ? <p className="mdx-caption mdx-metric-label">{label}</p> : null}
       <p className="mdx-metric-value">{value ?? children}</p>
       {hint ? <p className="mdx-caption mdx-metric-hint">{hint}</p> : null}
     </article>
+  );
+}
+
+type MdxChartProps = HTMLAttributes<HTMLDivElement> & {
+  chartType?: string | null;
+  title?: ReactNode;
+  tone?: CardTone | string;
+  valueSuffix?: string | null;
+  highlight?: string | null;
+  data: SceneChartDatum[];
+};
+
+function MdxChart({
+  className,
+  chartType,
+  title,
+  tone = "default",
+  valueSuffix,
+  highlight,
+  data,
+  style,
+  ...props
+}: MdxChartProps) {
+  const layoutScope = useLayoutScope();
+  const normalizedTone = normalizeCardTone(tone);
+  const normalizedType =
+    chartType?.trim().toLowerCase() === "trend" ? "trend" : "bar";
+  const safeData = data.filter(
+    (item) =>
+      typeof item.label === "string" &&
+      item.label.trim().length > 0 &&
+      Number.isFinite(item.value),
+  );
+  const maxValue = safeData.reduce(
+    (max, item) => Math.max(max, Math.abs(item.value)),
+    0,
+  );
+  const trendPoints = safeData.map((item, index) => {
+    const width = 100;
+    const height = 58;
+    const left = 6;
+    const right = 96;
+    const top = 6;
+    const bottom = 52;
+    const span = Math.max(maxValue, 1);
+    const x =
+      safeData.length <= 1
+        ? (left + right) / 2
+        : left + ((right - left) * index) / (safeData.length - 1);
+    const y = bottom - (item.value / span) * (bottom - top);
+    return { ...item, x, y };
+  });
+  const trendPath = trendPoints
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+    .join(" ");
+  const trendAreaPath =
+    trendPoints.length > 1
+      ? `${trendPath} L ${trendPoints[trendPoints.length - 1].x} 58 L ${trendPoints[0].x} 58 Z`
+      : "";
+  const chartAccent = chartColorForTone(normalizedTone, 0, true);
+  const chartStyle = {
+    ...(style ?? {}),
+    "--mdx-chart-accent": chartAccent,
+  } as CSSProperties;
+
+  return (
+    <section
+      {...props}
+      className={["mdx-chart", className].filter(Boolean).join(" ")}
+      style={chartStyle}
+      data-chart-type={normalizedType}
+      data-tone={normalizedTone}
+      data-area-shape={layoutScope.areaShape}
+      data-area-density={layoutScope.areaDensity}
+    >
+      {title ? <div className="mdx-chart-title">{title}</div> : null}
+      {normalizedType === "trend" ? (
+        <div className="mdx-chart-trend">
+          <svg
+            className="mdx-chart-svg"
+            viewBox="0 0 100 64"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <line x1="6" y1="52" x2="96" y2="52" className="mdx-chart-grid" />
+            <line x1="6" y1="29" x2="96" y2="29" className="mdx-chart-grid" />
+            <line x1="6" y1="6" x2="96" y2="6" className="mdx-chart-grid" />
+            {trendAreaPath ? (
+              <path d={trendAreaPath} className="mdx-chart-area" />
+            ) : null}
+            {trendPath ? (
+              <path
+                d={trendPath}
+                className="mdx-chart-line"
+                style={{
+                  stroke: chartAccent,
+                }}
+              />
+            ) : null}
+            {trendPoints.map((point, index) => {
+              const emphasized =
+                point.label === highlight || index === trendPoints.length - 1;
+              return (
+                <circle
+                  key={`${point.label}-${index}`}
+                  cx={point.x}
+                  cy={point.y}
+                  r={emphasized ? 2.4 : 2}
+                  className="mdx-chart-point"
+                  style={{
+                    fill: chartColorForTone(normalizedTone, index, emphasized),
+                  }}
+                />
+              );
+            })}
+          </svg>
+          <div className="mdx-chart-trend-labels">
+            {safeData.map((item) => (
+              <div key={item.label} className="mdx-chart-trend-label">
+                <span>{item.label}</span>
+                <strong>{formatChartValue(item.value, valueSuffix)}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="mdx-chart-bars">
+          {safeData.map((item, index) => {
+            const emphasized = item.label === highlight;
+            const width =
+              maxValue > 0
+                ? `${(Math.abs(item.value) / maxValue) * 100}%`
+                : "0%";
+            return (
+              <div key={`${item.label}-${index}`} className="mdx-chart-bar-row">
+                <span className="mdx-chart-bar-label">{item.label}</span>
+                <div className="mdx-chart-bar-track">
+                  <span
+                    className="mdx-chart-bar-fill"
+                    data-emphasized={emphasized ? "true" : "false"}
+                    style={{
+                      width,
+                      background: chartColorForTone(
+                        normalizedTone,
+                        index,
+                        emphasized,
+                      ),
+                    }}
+                  />
+                </div>
+                <strong className="mdx-chart-bar-value">
+                  {formatChartValue(item.value, valueSuffix)}
+                </strong>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+type MdxPillRowProps = HTMLAttributes<HTMLDivElement> & {
+  gap?: LayoutGapScale | string;
+};
+
+function MdxPillRow({
+  children,
+  className,
+  style,
+  gap = "sm",
+  ...props
+}: MdxPillRowProps) {
+  return (
+    <div
+      {...props}
+      className={["mdx-pill-row", className].filter(Boolean).join(" ")}
+      style={{
+        gap: layoutGapCssValue(gap),
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+type MdxPillProps = HTMLAttributes<HTMLSpanElement> & {
+  tone?: CardTone | string;
+};
+
+function MdxPill({
+  children,
+  className,
+  tone = "default",
+  ...props
+}: MdxPillProps) {
+  const normalizedTone = normalizeCardTone(tone);
+  return (
+    <span
+      {...props}
+      className={["mdx-pill", `mdx-pill--${normalizedTone}`, className]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -325,8 +1303,75 @@ function MdxCaption({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div {...props} className={["mdx-caption", className].filter(Boolean).join(" ")}>
+    <div
+      {...props}
+      className={["mdx-caption", className].filter(Boolean).join(" ")}
+    >
       {children}
+    </div>
+  );
+}
+
+type MdxQuoteProps = HTMLAttributes<HTMLQuoteElement> & {
+  attribution?: ReactNode;
+};
+
+function MdxQuote({
+  children,
+  className,
+  attribution,
+  ...props
+}: MdxQuoteProps) {
+  return (
+    <blockquote
+      {...props}
+      className={["mdx-quote", className].filter(Boolean).join(" ")}
+    >
+      <div className="mdx-quote-body">{children}</div>
+      {attribution ? (
+        <footer className="mdx-quote-attribution">{attribution}</footer>
+      ) : null}
+    </blockquote>
+  );
+}
+
+function MdxRule({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      {...props}
+      className={["mdx-rule", className].filter(Boolean).join(" ")}
+    />
+  );
+}
+
+type MdxArrowProps = HTMLAttributes<HTMLDivElement> & {
+  direction?: string | null;
+  tone?: CardTone | string;
+  label?: ReactNode;
+};
+
+function MdxArrow({
+  className,
+  direction,
+  tone = "default",
+  label,
+  ...props
+}: MdxArrowProps) {
+  const normalizedTone = normalizeCardTone(tone);
+  const normalizedDirection =
+    direction === "left" || direction === "up" || direction === "down"
+      ? direction
+      : "right";
+  return (
+    <div
+      {...props}
+      className={["mdx-arrow", className].filter(Boolean).join(" ")}
+      data-direction={normalizedDirection}
+      data-tone={normalizedTone}
+    >
+      {label ? <span className="mdx-arrow-label">{label}</span> : null}
+      <span className="mdx-arrow-line" />
+      <span className="mdx-arrow-head" />
     </div>
   );
 }
@@ -342,11 +1387,102 @@ function isTauriRuntime(): boolean {
   return Boolean(runtimeWindow.__TAURI_INTERNALS__ || runtimeWindow.__TAURI__);
 }
 
-async function call<T>(command: string, payload?: Record<string, unknown>): Promise<T> {
-  if (!isTauriRuntime()) {
-    throw new Error("Tauri runtime not detected. Launch this screen with `npm run tauri:dev`.");
+async function call<T>(
+  command: string,
+  payload?: Record<string, unknown>,
+): Promise<T> {
+  if (isTauriRuntime()) {
+    return invoke<T>(command, payload);
   }
-  return invoke<T>(command, payload);
+
+  const path = typeof payload?.path === "string" ? payload.path : "";
+
+  let response: Response;
+  switch (command) {
+    case "get_app_state":
+      response = await fetch(`${AGENT_HOOK_BASE_URL}/app-state`);
+      break;
+    case "open_project":
+    case "load_project":
+      response = await fetch(`${AGENT_HOOK_BASE_URL}/open-project`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path }),
+      });
+      break;
+    case "analyze_project":
+      response = await fetch(
+        `${AGENT_HOOK_BASE_URL}/analyze-project?path=${encodeURIComponent(path)}`,
+      );
+      break;
+    case "compile_project_scene":
+      response = await fetch(
+        `${AGENT_HOOK_BASE_URL}/compile-project-scene?path=${encodeURIComponent(path)}`,
+      );
+      break;
+    case "get_component_catalog":
+      response = await fetch(`${AGENT_HOOK_BASE_URL}/component-catalog`);
+      break;
+    case "get_component_template": {
+      const name = typeof payload?.name === "string" ? payload.name : "";
+      response = await fetch(
+        `${AGENT_HOOK_BASE_URL}/component-template?name=${encodeURIComponent(name)}`,
+      );
+      break;
+    }
+    case "save_component_template":
+      response = await fetch(`${AGENT_HOOK_BASE_URL}/save-component-template`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload ?? {}),
+      });
+      break;
+    case "compile_project_scene_manifest":
+      response = await fetch(
+        `${AGENT_HOOK_BASE_URL}/compile-project-scene-manifest?path=${encodeURIComponent(path)}`,
+      );
+      break;
+    case "compile_project_scene_slide": {
+      const index = typeof payload?.index === "number" ? payload.index : -1;
+      response = await fetch(
+        `${AGENT_HOOK_BASE_URL}/compile-project-scene-slide?path=${encodeURIComponent(path)}&index=${encodeURIComponent(String(index))}`,
+      );
+      break;
+    }
+    case "read_project_css":
+      response = await fetch(
+        `${AGENT_HOOK_BASE_URL}/project-css?path=${encodeURIComponent(path)}`,
+      );
+      break;
+    case "save_project_css":
+      response = await fetch(`${AGENT_HOOK_BASE_URL}/project-css`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          path,
+          css: typeof payload?.css === "string" ? payload.css : "",
+        }),
+      });
+      break;
+    default:
+      throw new Error(
+        `Command \`${command}\` is unavailable outside Tauri runtime.`,
+      );
+  }
+
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const errorMessage =
+      data &&
+      typeof data === "object" &&
+      "error" in data &&
+      typeof data.error === "string"
+        ? data.error
+        : `Hook request failed for \`${command}\`.`;
+    throw new Error(errorMessage);
+  }
+
+  return data as T;
 }
 
 async function pickFolder(title: string): Promise<string> {
@@ -426,7 +1562,10 @@ const SYNTAX_THEME_LABELS: Record<SyntaxThemeName, string> = {
   "material-light": "Material Light",
 };
 
-const SYNTAX_THEME_STYLES: Record<SyntaxThemeName, Record<string, CSSProperties>> = {
+const SYNTAX_THEME_STYLES: Record<
+  SyntaxThemeName,
+  Record<string, CSSProperties>
+> = {
   "one-dark": oneDark,
   "one-light": oneLight,
   "vsc-dark-plus": vscDarkPlus,
@@ -468,10 +1607,10 @@ type SlideTokens = {
 
 const DEFAULT_TOKENS: SlideTokens = {
   slideBg: "#0e0d0a",
-  slideBorder: "#efefeb1f",
+  slideBorder: "#00000000",
   slideRadius: "10px",
-  slidePadding: "32px",
-  slideLayoutGap: "16px",
+  slidePadding: "24px",
+  slideLayoutGap: "14px",
   slideCardBg: "#ffffff08",
   slideCardBorder: "#00000000",
   slideCardRadius: "10px",
@@ -533,7 +1672,7 @@ const FONT_OPTIONS = [
   '"Helvetica Neue", Helvetica, Arial, sans-serif',
   'Georgia, "Times New Roman", serif',
   '"Fira Code", monospace',
-  'system-ui, sans-serif',
+  "system-ui, sans-serif",
 ];
 
 const MONO_FONT_OPTIONS = [
@@ -600,10 +1739,208 @@ const EXPORT_SKILL_MENU_EVENT = "fastslides://export-skill";
 const PREVIEW_ZOOM_MIN = 0.8;
 const PREVIEW_ZOOM_MAX = 2.5;
 const PREVIEW_ZOOM_STEP = 0.05;
-const PROJECT_ROOT_ABSOLUTE_ASSET_PREFIXES = ["/assets/", "/images/", "/media/", "/data/"];
+const MAX_SCENE_SLIDE_WORKERS = 6;
+const PROJECT_ROOT_ABSOLUTE_ASSET_PREFIXES = [
+  "/assets/",
+  "/images/",
+  "/media/",
+  "/data/",
+];
 const projectAssetDataUrlCache = new Map<string, string>();
 const IMAGE_ASSET_EXTENSION_RE = /\.(avif|bmp|gif|jpe?g|png|svg|webp)$/i;
 const VIDEO_ASSET_EXTENSION_RE = /\.(m4v|mov|mp4|ogv|ogg|webm)$/i;
+const AGENT_HOOK_BASE_URL = "http://127.0.0.1:38473";
+const SCENE_SESSION_EVENT_NAME = "fastslides://scene-session-event";
+
+type InitialPreviewRouteState = {
+  deckPath: string;
+  slideIndex: number | null;
+  presenterMode: boolean;
+};
+
+function readInitialPreviewRouteState(): InitialPreviewRouteState {
+  if (typeof window === "undefined") {
+    return { deckPath: "", slideIndex: null, presenterMode: false };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const deckPath = params.get("deckPath")?.trim() || "";
+  const rawSlide = params.get("slide")?.trim() || "";
+  const parsedSlide = Number.parseInt(rawSlide, 10);
+  const slideIndex =
+    Number.isFinite(parsedSlide) && parsedSlide > 0 ? parsedSlide - 1 : null;
+  const rawPresenter = params.get("presenter")?.trim().toLowerCase() || "";
+  const presenterMode =
+    rawPresenter === "1" || rawPresenter === "true" || rawPresenter === "yes";
+
+  return { deckPath, slideIndex, presenterMode };
+}
+
+function nextSceneSessionId(): string {
+  return `scene-session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function preferredSceneWorkerCount(): number {
+  if (typeof navigator === "undefined") {
+    return 4;
+  }
+  const concurrency = navigator.hardwareConcurrency || 8;
+  return Math.min(
+    MAX_SCENE_SLIDE_WORKERS,
+    Math.max(2, Math.floor(concurrency / 2)),
+  );
+}
+
+function createPreviewProjectScene(
+  manifest: ProjectSceneManifest,
+): PreviewProjectScene {
+  return {
+    ...manifest,
+    slides: manifest.slides.map((slide) => ({
+      ...slide,
+      nodes: [],
+      source_mdx: "",
+      status: "loading",
+      error: null,
+    })),
+  };
+}
+
+function mergeCompiledSceneSlide(
+  current: PreviewProjectScene,
+  compiledSlide: SceneSlide,
+): PreviewProjectScene {
+  return {
+    ...current,
+    slides: current.slides.map((slide) =>
+      slide.index === compiledSlide.index
+        ? {
+            ...slide,
+            ...compiledSlide,
+            status: "ready",
+            error: null,
+          }
+        : slide,
+    ),
+  };
+}
+
+function markSceneSlideError(
+  current: PreviewProjectScene,
+  index: number,
+  error: string,
+): PreviewProjectScene {
+  return {
+    ...current,
+    slides: current.slides.map((slide) =>
+      slide.index === index
+        ? {
+            ...slide,
+            nodes: [],
+            source_mdx: "",
+            status: "error",
+            error,
+          }
+        : slide,
+    ),
+  };
+}
+
+function applySceneSessionEvent(
+  current: PreviewProjectScene | null,
+  event: ProjectSceneSessionEvent,
+): PreviewProjectScene | null {
+  switch (event.kind) {
+    case "manifest":
+      return createPreviewProjectScene(event.scene);
+    case "slide-ready":
+      return current ? mergeCompiledSceneSlide(current, event.slide) : current;
+    case "slide-error":
+      return current
+        ? markSceneSlideError(current, event.index, event.error)
+        : current;
+    case "complete":
+      return current;
+    default:
+      return current;
+  }
+}
+
+function prioritizeSceneSlideIndices(
+  total: number,
+  startIndex: number,
+): number[] {
+  if (total <= 0) {
+    return [];
+  }
+
+  const clampedStart = Math.min(Math.max(startIndex, 0), total - 1);
+  const ordered: number[] = [];
+
+  for (let offset = 0; ordered.length < total; offset += 1) {
+    const forward = clampedStart + offset;
+    if (forward < total) {
+      ordered.push(forward);
+    }
+    const backward = clampedStart - offset;
+    if (offset > 0 && backward >= 0) {
+      ordered.push(backward);
+    }
+  }
+
+  return ordered;
+}
+
+function takeNextSceneSlideIndex(
+  pending: number[],
+  preferredIndex: number,
+): number | null {
+  if (pending.length === 0) {
+    return null;
+  }
+
+  let bestPosition = pending.indexOf(preferredIndex);
+  if (bestPosition < 0) {
+    let bestDistance = Number.POSITIVE_INFINITY;
+    bestPosition = 0;
+    for (let position = 0; position < pending.length; position += 1) {
+      const distance = Math.abs(pending[position] - preferredIndex);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestPosition = position;
+      }
+    }
+  }
+
+  const [nextIndex] = pending.splice(bestPosition, 1);
+  return typeof nextIndex === "number" ? nextIndex : null;
+}
+
+function summarizePreviewScene(scene: PreviewProjectScene | null) {
+  if (!scene) {
+    return null;
+  }
+
+  let readyCount = 0;
+  let errorCount = 0;
+  for (const slide of scene.slides) {
+    if (slide.status === "ready") {
+      readyCount += 1;
+    } else if (slide.status === "error") {
+      errorCount += 1;
+    }
+  }
+
+  const totalCount = scene.slide_count;
+  const loadingCount = Math.max(totalCount - readyCount - errorCount, 0);
+  return {
+    totalCount,
+    readyCount,
+    errorCount,
+    loadingCount,
+    complete: loadingCount === 0,
+  };
+}
 
 function clampPreviewZoom(zoom: number): number {
   return Math.min(PREVIEW_ZOOM_MAX, Math.max(PREVIEW_ZOOM_MIN, zoom));
@@ -613,12 +1950,20 @@ function clampSidebarWidth(width: number): number {
   return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, width));
 }
 
-function stripFrontmatter(source: string): string {
-  return source.replace(/^---\s*\n[\s\S]*?\n---\s*(?:\n|$)/, "");
+function normalizeRawHtmlFragment(source: string): string {
+  return source
+    .replace(/\bclassName=/g, "class=")
+    .replace(/\bhtmlFor=/g, "for=");
 }
 
-function normalizeDeckSource(source: string): string {
-  return stripFrontmatter(source).trim();
+function canRenderRawHtmlFragment(source: string): boolean {
+  if (!source.trim().startsWith("<")) {
+    return false;
+  }
+  if (/[{}]/.test(source)) {
+    return false;
+  }
+  return /<[a-z][\w-]*\b/.test(source);
 }
 
 function clampUnit(value: number): number {
@@ -638,7 +1983,10 @@ function isExternalAssetPath(value: string): boolean {
   );
 }
 
-function splitAssetPathAndSuffix(raw: string): { pathOnly: string; suffix: string } {
+function splitAssetPathAndSuffix(raw: string): {
+  pathOnly: string;
+  suffix: string;
+} {
   const match = raw.match(/^([^?#]*)(.*)$/);
   return {
     pathOnly: match?.[1] ?? raw,
@@ -660,7 +2008,8 @@ function normalizeProjectRelativeAsset(raw: string): string | null {
   let relative = pathOnly.replace(/\\/g, "/");
   if (relative.startsWith("/")) {
     const supportedRootRelative = PROJECT_ROOT_ABSOLUTE_ASSET_PREFIXES.some(
-      (prefix) => relative === prefix.slice(0, -1) || relative.startsWith(prefix),
+      (prefix) =>
+        relative === prefix.slice(0, -1) || relative.startsWith(prefix),
     );
     if (!supportedRootRelative) {
       return null;
@@ -720,41 +2069,6 @@ function syntaxThemeModeForUiTheme(uiTheme: "dark" | "light"): SyntaxThemeMode {
   return uiTheme === "light" ? "light" : "dark";
 }
 
-function flattenText(value: unknown): string {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  if (Array.isArray(value)) {
-    return value.map((item) => flattenText(item)).join("");
-  }
-  if (isValidElement(value)) {
-    return flattenText((value.props as { children?: unknown }).children);
-  }
-  return "";
-}
-
-function extractFencedCode(children: ReactNode): { language: string; code: string } | null {
-  const nodes = Children.toArray(children);
-  const codeNode = nodes.find((node) => isValidElement(node) && node.type === "code");
-  if (!codeNode || !isValidElement(codeNode)) {
-    return null;
-  }
-
-  const props = codeNode.props as {
-    className?: string;
-    children?: ReactNode;
-  };
-  const className = props.className || "";
-  const languageMatch = className.match(/language-([\w-]+)/i);
-  const language = languageMatch?.[1]?.toLowerCase() ?? "";
-  const code = flattenText(props.children).replace(/\n$/, "");
-
-  return { language, code };
-}
-
 function MermaidDiagram({
   code,
   mermaidThemeName,
@@ -770,7 +2084,8 @@ function MermaidDiagram({
     setSvg("");
     setError("");
 
-    const theme = THEMES[mermaidThemeName as keyof typeof THEMES] ?? THEMES["zinc-dark"];
+    const theme =
+      THEMES[mermaidThemeName as keyof typeof THEMES] ?? THEMES["zinc-dark"];
     renderMermaid(code, {
       ...theme,
       transparent: true,
@@ -783,7 +2098,10 @@ function MermaidDiagram({
       })
       .catch((cause) => {
         if (!cancelled) {
-          const message = cause instanceof Error ? cause.message : "Failed to render Mermaid diagram.";
+          const message =
+            cause instanceof Error
+              ? cause.message
+              : "Failed to render Mermaid diagram.";
           setError(message);
         }
       });
@@ -815,33 +2133,32 @@ function MermaidDiagram({
   );
 }
 
-function MdxPreBlock({
-  children,
+function CodeBlockView({
+  code,
+  language,
   mermaidThemeName,
   syntaxThemeName,
   uiTheme,
-}: HTMLAttributes<HTMLPreElement> & {
-  children?: ReactNode;
+}: {
+  code: string;
+  language?: string | null;
   mermaidThemeName: MermaidThemeName;
   syntaxThemeName: SyntaxThemeName;
   uiTheme: "dark" | "light";
 }) {
-  const parsed = extractFencedCode(children);
-  if (!parsed) {
-    return <pre>{children}</pre>;
-  }
-
-  if (parsed.language === "mermaid") {
-    return <MermaidDiagram code={parsed.code} mermaidThemeName={mermaidThemeName} />;
+  const normalizedLanguage = language?.trim().toLowerCase() ?? "";
+  if (normalizedLanguage === "mermaid") {
+    return <MermaidDiagram code={code} mermaidThemeName={mermaidThemeName} />;
   }
 
   const syntaxTheme =
-    SYNTAX_THEME_STYLES[syntaxThemeName] || (uiTheme === "light" ? oneLight : oneDark);
+    SYNTAX_THEME_STYLES[syntaxThemeName] ||
+    (uiTheme === "light" ? oneLight : oneDark);
 
   return (
     <SyntaxHighlighter
       className="slide-syntax-block"
-      language={parsed.language || "text"}
+      language={normalizedLanguage || "text"}
       style={syntaxTheme}
       customStyle={{
         margin: 0,
@@ -858,22 +2175,33 @@ function MdxPreBlock({
         },
       }}
       wrapLongLines
-      showLineNumbers={parsed.code.split("\n").length > 6}
+      showLineNumbers={code.split("\n").length > 6}
       lineNumberStyle={{
         color: "var(--color-text-tertiary)",
         opacity: 0.85,
         paddingRight: "0.85rem",
       }}
     >
-      {parsed.code}
+      {code}
     </SyntaxHighlighter>
   );
 }
 
-async function resolveProjectAssetSource(projectPath: string, rawSrc: string): Promise<string> {
+async function resolveProjectAssetSource(
+  projectPath: string,
+  rawSrc: string,
+): Promise<string> {
   const normalizedRelative = normalizeProjectRelativeAsset(rawSrc);
-  if (!normalizedRelative || !projectPath || !isTauriRuntime()) {
+  if (!normalizedRelative || !projectPath) {
     return rawSrc;
+  }
+
+  if (!isTauriRuntime()) {
+    const params = new URLSearchParams({
+      projectPath,
+      src: normalizedRelative,
+    });
+    return `${AGENT_HOOK_BASE_URL}/project-asset?${params.toString()}`;
   }
 
   const cacheKey = `${projectPath}::${normalizedRelative}`;
@@ -922,11 +2250,491 @@ function ProjectAssetImage({
     };
   }, [projectPath, props.src]);
 
-  return <img {...props} src={resolvedSrc || source} loading={props.loading ?? "lazy"} />;
+  return (
+    <img
+      {...props}
+      src={resolvedSrc || source}
+      loading={props.loading ?? "lazy"}
+    />
+  );
+}
+
+function ProjectAssetVideo({
+  projectPath,
+  ...props
+}: VideoHTMLAttributes<HTMLVideoElement> & { projectPath: string }) {
+  const source = typeof props.src === "string" ? props.src : "";
+  const [resolvedSrc, setResolvedSrc] = useState(source);
+
+  useEffect(() => {
+    if (typeof props.src !== "string") {
+      return;
+    }
+
+    let cancelled = false;
+    setResolvedSrc(props.src);
+    resolveProjectAssetSource(projectPath, props.src)
+      .then((nextSource) => {
+        if (!cancelled) {
+          setResolvedSrc(nextSource);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setResolvedSrc(source);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectPath, props.src]);
+
+  return (
+    <video
+      {...props}
+      src={resolvedSrc || source}
+      controls={props.controls ?? true}
+    />
+  );
+}
+
+type SceneRenderContext = {
+  projectPath: string;
+  mermaidThemeName: MermaidThemeName;
+  syntaxThemeName: SyntaxThemeName;
+  uiTheme: "dark" | "light";
+};
+
+function renderSceneNodes(
+  nodes: SceneNode[],
+  context: SceneRenderContext,
+  pathPrefix: string,
+): ReactNode[] {
+  return nodes.map((node, index) =>
+    renderSceneNode(node, context, `${pathPrefix}-${index}`),
+  );
+}
+
+function sceneNodesTextLength(nodes: SceneNode[]): number {
+  return nodes.reduce((total, node) => {
+    switch (node.kind) {
+      case "canvas":
+      case "area":
+      case "layout-group":
+      case "surface":
+        return total + sceneNodesTextLength(node.children);
+      case "metric":
+        return (
+          total +
+          (node.label?.length ?? 0) +
+          (node.value?.length ?? 0) +
+          (node.hint?.length ?? 0)
+        );
+      case "chart":
+        return (
+          total +
+          (node.title?.length ?? 0) +
+          (node.value_suffix?.length ?? 0) +
+          node.data.reduce((sum, item) => sum + item.label.length, 0)
+        );
+      case "text":
+        return total + node.text.length;
+      case "list":
+        return total + node.items.reduce((sum, item) => sum + item.length, 0);
+      case "media":
+        return total + (node.alt?.length ?? 0);
+      case "code-block":
+        return total + node.code.length;
+      case "pill":
+        return total + node.text.length;
+      case "raw":
+        return total + node.text.length;
+      case "rule":
+        return total;
+      case "arrow":
+        return total + (node.label?.length ?? 0);
+      default:
+        return total;
+    }
+  }, 0);
+}
+
+function renderSceneTextNode(node: SceneTextNode, key: string): ReactNode {
+  const className = node.class_name || undefined;
+  if (node.role === "kicker") {
+    return (
+      <MdxKicker key={key} className={className}>
+        {node.text}
+      </MdxKicker>
+    );
+  }
+  if (node.role === "takeaway") {
+    const headingTag = node.level === 2 ? "h2" : node.level === 3 ? "h3" : "h1";
+    return (
+      <MdxTakeaway
+        key={key}
+        as={headingTag}
+        className={className}
+        textLength={node.text.length}
+      >
+        {node.text}
+      </MdxTakeaway>
+    );
+  }
+  if (node.role === "caption") {
+    return (
+      <MdxCaption key={key} className={className}>
+        {node.text}
+      </MdxCaption>
+    );
+  }
+  if (node.role === "heading") {
+    if (node.level === 2) {
+      return (
+        <h2 key={key} className={className}>
+          {node.text}
+        </h2>
+      );
+    }
+    if (node.level === 3) {
+      return (
+        <h3 key={key} className={className}>
+          {node.text}
+        </h3>
+      );
+    }
+    return (
+      <h1 key={key} className={className}>
+        {node.text}
+      </h1>
+    );
+  }
+  return (
+    <p key={key} className={className}>
+      {node.text}
+    </p>
+  );
+}
+
+function renderSceneNode(
+  node: SceneNode,
+  context: SceneRenderContext,
+  key: string,
+): ReactNode {
+  switch (node.kind) {
+    case "canvas":
+      return (
+        <MdxCanvas
+          key={key}
+          cols={node.cols}
+          rows={node.rows}
+          gap={node.gap ?? undefined}
+          className={node.class_name || undefined}
+        >
+          {renderSceneNodes(node.children, context, key)}
+        </MdxCanvas>
+      );
+    case "area":
+      return (
+        <MdxArea
+          key={key}
+          x={node.x}
+          y={node.y}
+          w={node.w}
+          h={node.h}
+          layer={node.layer ?? undefined}
+          gap={node.gap ?? undefined}
+          align={node.align ?? undefined}
+          justify={node.justify ?? undefined}
+          className={node.class_name || undefined}
+        >
+          {renderSceneNodes(node.children, context, key)}
+        </MdxArea>
+      );
+    case "layout-group":
+      if (node.component === "Stack") {
+        return (
+          <MdxStack
+            key={key}
+            gap={node.gap ?? undefined}
+            align={node.align ?? undefined}
+            justify={node.justify ?? undefined}
+            className={node.class_name || undefined}
+          >
+            {renderSceneNodes(node.children, context, key)}
+          </MdxStack>
+        );
+      }
+      if (node.component === "Row") {
+        return (
+          <MdxRow
+            key={key}
+            gap={node.gap ?? undefined}
+            align={node.align ?? undefined}
+            justify={node.justify ?? undefined}
+            nowrap={node.nowrap ?? false}
+            className={node.class_name || undefined}
+          >
+            {renderSceneNodes(node.children, context, key)}
+          </MdxRow>
+        );
+      }
+      if (node.component === "Grid") {
+        return (
+          <MdxGrid
+            key={key}
+            cols={node.cols ?? undefined}
+            gap={node.gap ?? undefined}
+            align={node.align ?? undefined}
+            className={node.class_name || undefined}
+          >
+            {renderSceneNodes(node.children, context, key)}
+          </MdxGrid>
+        );
+      }
+      if (node.component === "PillRow") {
+        return (
+          <MdxPillRow
+            key={key}
+            gap={node.gap ?? undefined}
+            className={node.class_name || undefined}
+          >
+            {renderSceneNodes(node.children, context, key)}
+          </MdxPillRow>
+        );
+      }
+      return (
+        <div
+          key={key}
+          className={["scene-unknown-node", node.class_name]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {renderSceneNodes(node.children, context, key)}
+        </div>
+      );
+    case "surface":
+      if (node.component === "Card") {
+        return (
+          <MdxCard
+            key={key}
+            title={node.title ?? undefined}
+            subtitle={node.subtitle ?? undefined}
+            tone={node.tone ?? undefined}
+            className={node.class_name || undefined}
+          >
+            {renderSceneNodes(node.children, context, key)}
+          </MdxCard>
+        );
+      }
+      if (node.component === "Panel") {
+        return (
+          <MdxPanel
+            key={key}
+            kicker={node.kicker ?? undefined}
+            title={node.title ?? undefined}
+            subtitle={node.subtitle ?? undefined}
+            foot={node.foot ?? undefined}
+            tone={node.tone ?? undefined}
+            bodyLength={sceneNodesTextLength(node.children)}
+            className={node.class_name || undefined}
+          >
+            {renderSceneNodes(node.children, context, key)}
+          </MdxPanel>
+        );
+      }
+      if (node.component === "Callout") {
+        return (
+          <MdxCallout
+            key={key}
+            title={node.title ?? undefined}
+            tone={node.tone ?? undefined}
+            bodyLength={sceneNodesTextLength(node.children)}
+            className={node.class_name || undefined}
+          >
+            {renderSceneNodes(node.children, context, key)}
+          </MdxCallout>
+        );
+      }
+      if (node.component === "Quote") {
+        return (
+          <MdxQuote
+            key={key}
+            attribution={node.attribution ?? undefined}
+            className={node.class_name || undefined}
+          >
+            {renderSceneNodes(node.children, context, key)}
+          </MdxQuote>
+        );
+      }
+      return (
+        <div
+          key={key}
+          className={["scene-unknown-node", node.class_name]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {renderSceneNodes(node.children, context, key)}
+        </div>
+      );
+    case "metric":
+      return (
+        <MdxMetric
+          key={key}
+          label={node.label ?? undefined}
+          value={node.value ?? undefined}
+          hint={node.hint ?? undefined}
+          valueLength={node.value?.length ?? 0}
+          hintLength={node.hint?.length ?? 0}
+          className={node.class_name || undefined}
+        />
+      );
+    case "chart":
+      return (
+        <MdxChart
+          key={key}
+          chartType={node.chart_type}
+          title={node.title ?? undefined}
+          tone={node.tone ?? undefined}
+          valueSuffix={node.value_suffix}
+          highlight={node.highlight}
+          data={node.data}
+          className={node.class_name || undefined}
+        />
+      );
+    case "text":
+      return renderSceneTextNode(node, key);
+    case "list":
+      if (node.ordered) {
+        return (
+          <ol key={key}>
+            {node.items.map((item, index) => (
+              <li key={`${key}-${index}`}>{item}</li>
+            ))}
+          </ol>
+        );
+      }
+      return (
+        <ul key={key}>
+          {node.items.map((item, index) => (
+            <li key={`${key}-${index}`}>{item}</li>
+          ))}
+        </ul>
+      );
+    case "media":
+      if (node.media_kind === "video") {
+        return (
+          <ProjectAssetVideo
+            key={key}
+            projectPath={context.projectPath}
+            src={node.src}
+            aria-label={node.alt || "Slide video"}
+          />
+        );
+      }
+      return (
+        <ProjectAssetImage
+          key={key}
+          projectPath={context.projectPath}
+          src={node.src}
+          alt={node.alt || "Slide image"}
+        />
+      );
+    case "code-block":
+      return (
+        <CodeBlockView
+          key={key}
+          code={node.code}
+          language={node.language}
+          mermaidThemeName={context.mermaidThemeName}
+          syntaxThemeName={context.syntaxThemeName}
+          uiTheme={context.uiTheme}
+        />
+      );
+    case "pill":
+      return (
+        <MdxPill
+          key={key}
+          tone={node.tone ?? undefined}
+          className={node.class_name || undefined}
+        >
+          {node.text}
+        </MdxPill>
+      );
+    case "rule":
+      return <MdxRule key={key} className={node.class_name || undefined} />;
+    case "arrow":
+      return (
+        <MdxArrow
+          key={key}
+          direction={node.direction}
+          tone={node.tone ?? undefined}
+          label={node.label ?? undefined}
+          className={node.class_name || undefined}
+        />
+      );
+    case "raw": {
+      const normalizedHtml = normalizeRawHtmlFragment(node.text);
+      if (node.format === "html" && canRenderRawHtmlFragment(normalizedHtml)) {
+        return (
+          <div
+            key={key}
+            className="scene-raw-html"
+            dangerouslySetInnerHTML={{ __html: normalizedHtml }}
+          />
+        );
+      }
+      return (
+        <pre key={key} className="scene-raw-node">
+          <code>{node.text}</code>
+        </pre>
+      );
+    }
+    default:
+      return null;
+  }
+}
+
+function renderSlidePlaceholder(
+  slide: PreviewSceneSlide,
+  detailed: boolean,
+): ReactNode {
+  if (slide.status === "error" || detailed) {
+    return (
+      <div
+        className={`embedded-slide-placeholder embedded-slide-placeholder-${slide.status}`}
+      >
+        <div className="embedded-slide-placeholder-meta">
+          Slide {slide.index + 1}
+        </div>
+        <h2>{slide.title || `Slide ${slide.index + 1}`}</h2>
+        <p>
+          {slide.status === "error"
+            ? slide.error || "This slide failed to compile."
+            : "Rendering slide scene…"}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="embedded-slide-placeholder embedded-slide-placeholder-loading"
+      data-quiet="true"
+      aria-label={`Rendering ${slide.title || `slide ${slide.index + 1}`}`}
+    >
+      <span className="embedded-slide-placeholder-skeleton embedded-slide-placeholder-skeleton-kicker" />
+      <span className="embedded-slide-placeholder-skeleton embedded-slide-placeholder-skeleton-title" />
+      <span className="embedded-slide-placeholder-skeleton embedded-slide-placeholder-skeleton-body" />
+      <span className="embedded-slide-placeholder-skeleton embedded-slide-placeholder-skeleton-body is-short" />
+    </div>
+  );
 }
 
 function EmbeddedDeckPreview({
-  source,
+  scene,
+  error,
   projectPath,
   mermaidThemeName,
   syntaxThemeName,
@@ -938,7 +2746,8 @@ function EmbeddedDeckPreview({
   onSlideOutlineChange,
   onAssetOpen,
 }: {
-  source: string;
+  scene: PreviewProjectScene | null;
+  error: string;
   projectPath: string;
   mermaidThemeName: MermaidThemeName;
   syntaxThemeName: SyntaxThemeName;
@@ -950,102 +2759,48 @@ function EmbeddedDeckPreview({
   onSlideOutlineChange: (slides: SlideOutlineEntry[]) => void;
   onAssetOpen: (asset: ExpandableAsset) => void;
 }) {
-  const [CompiledDeck, setCompiledDeck] = useState<ComponentType<Record<string, unknown>> | null>(null);
-  const [error, setError] = useState("");
   const previewRootRef = useRef<HTMLDivElement | null>(null);
   const slideElementsRef = useRef<HTMLElement[]>([]);
   const previousActiveSlideRef = useRef(-1);
-  const mdxComponents = useMemo(
+  const sceneRenderContext = useMemo<SceneRenderContext>(
     () => ({
-      img: (props: ImgHTMLAttributes<HTMLImageElement>) => {
-        return <ProjectAssetImage {...props} projectPath={projectPath} />;
-      },
-      pre: (props: HTMLAttributes<HTMLPreElement>) => (
-        <MdxPreBlock
-          {...props}
-          mermaidThemeName={mermaidThemeName}
-          syntaxThemeName={syntaxThemeName}
-          uiTheme={uiTheme}
-        />
-      ),
-      Stack: MdxStack,
-      Row: MdxRow,
-      Grid: MdxGrid,
-      Card: MdxCard,
-      Metric: MdxMetric,
-      Caption: MdxCaption,
+      projectPath,
+      mermaidThemeName,
+      syntaxThemeName,
+      uiTheme,
     }),
     [mermaidThemeName, projectPath, syntaxThemeName, uiTheme],
   );
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function compileSource() {
-      if (!source.trim()) {
-        setError("Project has an empty page.mdx.");
-        setCompiledDeck(null);
-        return;
-      }
-
-      setError("");
-      setCompiledDeck(null);
-
-      try {
-        const { evaluate } = await import("@mdx-js/mdx");
-        const module = await evaluate(source, {
-          ...jsxRuntime,
-          development: false,
-        });
-
-        if (!cancelled) {
-          setCompiledDeck(() => module.default as ComponentType<Record<string, unknown>>);
-        }
-      } catch (cause) {
-        if (cancelled) {
-          return;
-        }
-        const message =
-          cause instanceof Error ? cause.message : "Failed to compile page.mdx for embedded preview.";
-        setError(message);
-      }
+    if (!scene) {
+      onSlideCountChange(0);
+      onSlideOutlineChange([]);
+      return;
     }
 
-    void compileSource();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [source]);
+    onSlideCountChange(scene.slides.length);
+    onSlideOutlineChange(
+      scene.slides.map((slide, index) => ({
+        index,
+        title: slide.title || `Slide ${index + 1}`,
+        status: slide.status,
+      })),
+    );
+  }, [onSlideCountChange, onSlideOutlineChange, scene]);
 
   useEffect(() => {
     const root = previewRootRef.current;
-    if (!root || !CompiledDeck) {
+    if (!root || !scene) {
       slideElementsRef.current = [];
       previousActiveSlideRef.current = -1;
-      onSlideCountChange(0);
-      onSlideOutlineChange([]);
       return;
     }
 
     const slides = Array.from(root.querySelectorAll<HTMLElement>(".slide"));
     slideElementsRef.current = slides;
     previousActiveSlideRef.current = -1;
-    onSlideCountChange(slides.length);
     root.classList.remove("embedded-preview-single");
-
-    const nextOutline: SlideOutlineEntry[] = [];
-    for (let index = 0; index < slides.length; index += 1) {
-      const slide = slides[index];
-      slide.dataset.slideIndex = String(index);
-      const heading = slide.querySelector("h1, h2, h3");
-      const headingText = heading?.textContent?.trim();
-      nextOutline.push({
-        index,
-        title: headingText && headingText.length > 0 ? headingText : `Slide ${index + 1}`,
-      });
-    }
-    onSlideOutlineChange(nextOutline);
 
     if (slides.length === 0) {
       return;
@@ -1055,7 +2810,7 @@ function EmbeddedDeckPreview({
       slides[index].dataset.active = "false";
       slides[index].setAttribute("aria-hidden", "false");
     }
-  }, [CompiledDeck, onSlideCountChange, onSlideOutlineChange]);
+  }, [scene?.path, scene?.slide_count]);
 
   useEffect(() => {
     const root = previewRootRef.current;
@@ -1101,7 +2856,7 @@ function EmbeddedDeckPreview({
     }
 
     previousActiveSlideRef.current = safeIndex;
-  }, [activeSlideIndex, presenterMode]);
+  }, [activeSlideIndex, presenterMode, scene?.path, scene?.slide_count]);
 
   useEffect(() => {
     const root = previewRootRef.current;
@@ -1114,7 +2869,8 @@ function EmbeddedDeckPreview({
 
       const image = target?.closest("img") as HTMLImageElement | null;
       if (image) {
-        const rawSource = image.currentSrc || image.src || image.getAttribute("src") || "";
+        const rawSource =
+          image.currentSrc || image.src || image.getAttribute("src") || "";
         if (rawSource) {
           event.preventDefault();
           event.stopPropagation();
@@ -1129,7 +2885,8 @@ function EmbeddedDeckPreview({
 
       const video = target?.closest("video") as HTMLVideoElement | null;
       if (video) {
-        const sourceNode = video.querySelector<HTMLSourceElement>("source[src]");
+        const sourceNode =
+          video.querySelector<HTMLSourceElement>("source[src]");
         const rawSource =
           video.currentSrc ||
           video.src ||
@@ -1143,7 +2900,10 @@ function EmbeddedDeckPreview({
           onAssetOpen({
             kind: "video",
             src: rawSource,
-            alt: video.getAttribute("aria-label") || video.getAttribute("title") || "Slide video",
+            alt:
+              video.getAttribute("aria-label") ||
+              video.getAttribute("title") ||
+              "Slide video",
           });
           return;
         }
@@ -1189,28 +2949,66 @@ function EmbeddedDeckPreview({
     return <div className="embedded-preview-error">{error}</div>;
   }
 
-  if (!CompiledDeck) {
-    return <div className="embedded-preview-loading">Loading deck preview…</div>;
+  if (!scene) {
+    return (
+      <div className="embedded-preview-loading">Loading deck preview…</div>
+    );
   }
 
   return (
     <div ref={previewRootRef} className="embedded-preview-deck">
-      <CompiledDeck components={mdxComponents} />
+      <div
+        className={Array.from(
+          new Set(
+            ["deck", scene.deck_class_name || ""]
+              .join(" ")
+              .split(/\s+/)
+              .filter(Boolean),
+          ),
+        ).join(" ")}
+      >
+        {scene.slides.map((slide) => (
+          <section
+            key={slide.index}
+            className={`slide slide-${slide.status}`}
+            data-slide-index={slide.index}
+            data-slide-status={slide.status}
+            aria-busy={slide.status === "loading"}
+          >
+            {slide.status === "ready"
+              ? renderSceneNodes(
+                  slide.nodes,
+                  sceneRenderContext,
+                  `slide-${slide.index}`,
+                )
+              : renderSlidePlaceholder(
+                  slide,
+                  presenterMode && slide.index === activeSlideIndex,
+                )}
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
 
 export default function Home() {
+  const initialPreviewRoute = useMemo(readInitialPreviewRouteState, []);
   const [appState, setAppState] = useState<AppState | null>(null);
   const [selectedPath, setSelectedPath] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [sidebarDragging, setSidebarDragging] = useState(false);
-  const [selectedProjectDetail, setSelectedProjectDetail] = useState<ProjectDetail | null>(null);
+  const [selectedProjectDetail, setSelectedProjectDetail] =
+    useState<ProjectDetail | null>(null);
   const [presenterMode, setPresenterMode] = useState(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [embeddedSlideCount, setEmbeddedSlideCount] = useState(0);
   const [slideOutline, setSlideOutline] = useState<SlideOutlineEntry[]>([]);
+  const [projectScene, setProjectScene] = useState<PreviewProjectScene | null>(
+    null,
+  );
+  const [projectSceneError, setProjectSceneError] = useState("");
   const [previewDockVisible, setPreviewDockVisible] = useState(true);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -1221,40 +3019,65 @@ export default function Home() {
     }
     return "dark";
   });
-  const [mermaidThemeName, setMermaidThemeName] = useState<MermaidThemeName>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(MERMAID_THEME_STATE_KEY);
-      if (stored && isMermaidThemeName(stored)) {
-        return stored;
+  const [mermaidThemeName, setMermaidThemeName] = useState<MermaidThemeName>(
+    () => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem(MERMAID_THEME_STATE_KEY);
+        if (stored && isMermaidThemeName(stored)) {
+          return stored;
+        }
+        const storedUiTheme = localStorage.getItem(THEME_STATE_KEY);
+        if (storedUiTheme === "light") {
+          return "github-light";
+        }
       }
-      const storedUiTheme = localStorage.getItem(THEME_STATE_KEY);
-      if (storedUiTheme === "light") {
-        return "github-light";
+      return "zinc-dark";
+    },
+  );
+  const [syntaxThemeName, setSyntaxThemeName] = useState<SyntaxThemeName>(
+    () => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem(SYNTAX_THEME_STATE_KEY);
+        if (stored && isSyntaxThemeName(stored)) {
+          return stored;
+        }
+        const storedUiTheme =
+          localStorage.getItem(THEME_STATE_KEY) === "light" ? "light" : "dark";
+        const mode = syntaxThemeModeForUiTheme(storedUiTheme);
+        return SYNTAX_THEME_OPTIONS_BY_MODE[mode][0];
       }
-    }
-    return "zinc-dark";
-  });
-  const [syntaxThemeName, setSyntaxThemeName] = useState<SyntaxThemeName>(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(SYNTAX_THEME_STATE_KEY);
-      if (stored && isSyntaxThemeName(stored)) {
-        return stored;
-      }
-      const storedUiTheme = localStorage.getItem(THEME_STATE_KEY) === "light" ? "light" : "dark";
-      const mode = syntaxThemeModeForUiTheme(storedUiTheme);
-      return SYNTAX_THEME_OPTIONS_BY_MODE[mode][0];
-    }
-    return SYNTAX_THEME_OPTIONS_BY_MODE.dark[0];
-  });
+      return SYNTAX_THEME_OPTIONS_BY_MODE.dark[0];
+    },
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [expandedAsset, setExpandedAsset] = useState<ExpandableAsset | null>(null);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("theme");
+  const [expandedAsset, setExpandedAsset] = useState<ExpandableAsset | null>(
+    null,
+  );
   const [projectCss, setProjectCss] = useState("");
   const [cssEditorValue, setCssEditorValue] = useState("");
-  const [slideTokens, setSlideTokens] = useState<SlideTokens>({ ...DEFAULT_TOKENS });
+  const [slideTokens, setSlideTokens] = useState<SlideTokens>({
+    ...DEFAULT_TOKENS,
+  });
+  const [componentCatalog, setComponentCatalog] =
+    useState<ComponentCatalog | null>(null);
+  const [componentCatalogLoading, setComponentCatalogLoading] = useState(false);
+  const [componentCatalogError, setComponentCatalogError] = useState("");
+  const [selectedComponentName, setSelectedComponentName] = useState("");
+  const [selectedComponentTemplate, setSelectedComponentTemplate] =
+    useState<DesignTemplate | null>(null);
+  const [componentTemplateLoading, setComponentTemplateLoading] =
+    useState(false);
+  const [componentTemplateError, setComponentTemplateError] = useState("");
   const sidebarResizeCleanupRef = useRef<(() => void) | null>(null);
   const previewDockHideTimerRef = useRef<number | null>(null);
   const previewDockHoveringRef = useRef(false);
   const previewSurfaceRef = useRef<HTMLDivElement | null>(null);
+  const initialPreviewRouteAppliedRef = useRef(false);
+  const sceneCompileRequestIdRef = useRef(0);
+  const sceneSessionIdRef = useRef("");
+  const sceneCompilePumpRef = useRef<(() => void) | null>(null);
+  const sceneCompilePriorityIndexRef = useRef(0);
 
   // Restore selection on load
   useEffect(() => {
@@ -1316,26 +3139,58 @@ export default function Home() {
     return projects.find((project) => project.path === selectedPath) || null;
   }, [projects, selectedPath]);
 
-  const selectedProjectEmbeddedSource = useMemo(
-    () => normalizeDeckSource(selectedProjectDetail?.page_mdx || ""),
-    [selectedProjectDetail?.page_mdx],
-  );
-
   const visibleSlideCount = useMemo(() => {
-    const fallbackCount = selectedProjectDetail?.slide_count || selectedProject?.slide_count || 0;
+    const fallbackCount =
+      projectScene?.slide_count ||
+      selectedProjectDetail?.slide_count ||
+      selectedProject?.slide_count ||
+      0;
     return embeddedSlideCount > 0 ? embeddedSlideCount : fallbackCount;
-  }, [embeddedSlideCount, selectedProject?.slide_count, selectedProjectDetail?.slide_count]);
+  }, [
+    embeddedSlideCount,
+    projectScene?.slide_count,
+    selectedProject?.slide_count,
+    selectedProjectDetail?.slide_count,
+  ]);
 
   const maxSlideIndex = Math.max(visibleSlideCount - 1, 0);
+  const sceneLoadSummary = useMemo(
+    () => summarizePreviewScene(projectScene),
+    [projectScene],
+  );
   const slideTocEntries = useMemo<SlideOutlineEntry[]>(() => {
     if (slideOutline.length > 0) {
       return slideOutline;
+    }
+    if (projectScene?.slides.length) {
+      return projectScene.slides.map((slide, index) => ({
+        index,
+        title: slide.title || `Slide ${index + 1}`,
+        status: slide.status,
+      }));
     }
     return Array.from({ length: visibleSlideCount }, (_, index) => ({
       index,
       title: `Slide ${index + 1}`,
     }));
-  }, [slideOutline, visibleSlideCount]);
+  }, [projectScene?.slides, slideOutline, visibleSlideCount]);
+
+  const previewStatusLabel = useMemo(() => {
+    if (!selectedProject || projectSceneError) {
+      return "";
+    }
+    if (!projectScene) {
+      return "Preparing slide manifest…";
+    }
+    if (
+      !sceneLoadSummary ||
+      sceneLoadSummary.totalCount === 0 ||
+      sceneLoadSummary.complete
+    ) {
+      return "";
+    }
+    return `Rendering slides ${sceneLoadSummary.readyCount}/${sceneLoadSummary.totalCount}`;
+  }, [projectScene, projectSceneError, sceneLoadSummary, selectedProject]);
 
   useEffect(() => {
     setActiveSlideIndex(0);
@@ -1343,6 +3198,39 @@ export default function Home() {
     setSlideOutline([]);
     setPresenterMode(false);
   }, [selectedProject?.path]);
+
+  useEffect(() => {
+    sceneCompilePriorityIndexRef.current = activeSlideIndex;
+    sceneCompilePumpRef.current?.();
+  }, [activeSlideIndex, selectedProject?.path]);
+
+  useEffect(() => {
+    if (initialPreviewRouteAppliedRef.current) {
+      return;
+    }
+    if (!selectedProject || !projectScene) {
+      return;
+    }
+
+    const requestedSlideIndex = initialPreviewRoute.slideIndex;
+    const requestedPresenterMode = initialPreviewRoute.presenterMode;
+    if (requestedSlideIndex === null && !requestedPresenterMode) {
+      initialPreviewRouteAppliedRef.current = true;
+      return;
+    }
+
+    const maxIndex = Math.max(projectScene.slide_count - 1, 0);
+    setActiveSlideIndex(
+      Math.min(Math.max(requestedSlideIndex ?? 0, 0), maxIndex),
+    );
+    setPresenterMode(requestedPresenterMode);
+    initialPreviewRouteAppliedRef.current = true;
+  }, [
+    initialPreviewRoute.presenterMode,
+    initialPreviewRoute.slideIndex,
+    projectScene,
+    selectedProject,
+  ]);
 
   useEffect(() => {
     if (!selectedProject) {
@@ -1360,6 +3248,8 @@ export default function Home() {
   useEffect(() => {
     if (!selectedProject) {
       setSelectedProjectDetail(null);
+      setProjectScene(null);
+      setProjectSceneError("");
       return;
     }
 
@@ -1372,7 +3262,10 @@ export default function Home() {
       })
       .catch((cause) => {
         if (!cancelled) {
-          const message = cause instanceof Error ? cause.message : "Failed to load project source.";
+          const message =
+            cause instanceof Error
+              ? cause.message
+              : "Failed to load project source.";
           console.log(message);
           setSelectedProjectDetail(null);
         }
@@ -1382,6 +3275,304 @@ export default function Home() {
       cancelled = true;
     };
   }, [selectedProject?.path]);
+
+  useEffect(() => {
+    if (!selectedProject) {
+      setProjectScene(null);
+      setProjectSceneError("");
+      sceneSessionIdRef.current = "";
+      sceneCompilePumpRef.current = null;
+      return;
+    }
+
+    let cancelled = false;
+    const requestId = sceneCompileRequestIdRef.current + 1;
+    sceneCompileRequestIdRef.current = requestId;
+    sceneCompilePriorityIndexRef.current = activeSlideIndex;
+    const selectedProjectPath = selectedProject.path;
+    setProjectScene(null);
+    setProjectSceneError("");
+
+    const isCurrentRequest = (): boolean =>
+      !cancelled && sceneCompileRequestIdRef.current === requestId;
+
+    const updateScene = (
+      updater: (
+        current: PreviewProjectScene | null,
+      ) => PreviewProjectScene | null,
+    ): void => {
+      if (!isCurrentRequest()) {
+        return;
+      }
+      startTransition(() => {
+        setProjectScene((current) => {
+          if (!isCurrentRequest()) {
+            return current;
+          }
+          return updater(current);
+        });
+      });
+    };
+
+    if (isTauriRuntime()) {
+      sceneCompilePumpRef.current = null;
+      let unlistenSceneSession: (() => void) | null = null;
+
+      async function startNativeSceneSession(): Promise<void> {
+        try {
+          const { listen } = await import("@tauri-apps/api/event");
+          const cleanup = await listen<ProjectSceneSessionEvent>(
+            SCENE_SESSION_EVENT_NAME,
+            (event) => {
+              if (!isCurrentRequest()) {
+                return;
+              }
+              const payload = event.payload;
+              if (
+                !payload ||
+                payload.session_id !== sceneSessionIdRef.current
+              ) {
+                return;
+              }
+              updateScene((current) =>
+                applySceneSessionEvent(current, payload),
+              );
+            },
+          );
+
+          if (!isCurrentRequest()) {
+            cleanup();
+            return;
+          }
+
+          unlistenSceneSession = cleanup;
+          const nextSessionId = nextSceneSessionId();
+          sceneSessionIdRef.current = nextSessionId;
+          const session = await call<ProjectSceneSessionHandle>(
+            "start_project_scene_session",
+            {
+              path: selectedProjectPath,
+              priorityIndex: activeSlideIndex,
+              sessionId: nextSessionId,
+            },
+          );
+
+          if (!isCurrentRequest()) {
+            cleanup();
+            return;
+          }
+
+          sceneSessionIdRef.current = session.session_id;
+        } catch (cause) {
+          if (!isCurrentRequest()) {
+            return;
+          }
+          const message =
+            cause instanceof Error
+              ? cause.message
+              : "Failed to start project scene session.";
+          console.log(message);
+          setProjectScene(null);
+          setProjectSceneError(message);
+          sceneSessionIdRef.current = "";
+        }
+      }
+
+      void startNativeSceneSession();
+
+      return () => {
+        cancelled = true;
+        if (sceneCompileRequestIdRef.current === requestId) {
+          sceneCompilePumpRef.current = null;
+          sceneSessionIdRef.current = "";
+        }
+        unlistenSceneSession?.();
+      };
+    }
+
+    const pendingSlides: number[] = [];
+    const runningSlides = new Set<number>();
+    let manifestReady = false;
+    const workerCount = preferredSceneWorkerCount();
+
+    const pumpSlideQueue = (): void => {
+      if (!manifestReady || !isCurrentRequest()) {
+        return;
+      }
+
+      while (runningSlides.size < workerCount) {
+        const nextIndex = takeNextSceneSlideIndex(
+          pendingSlides,
+          sceneCompilePriorityIndexRef.current,
+        );
+        if (nextIndex === null) {
+          break;
+        }
+
+        runningSlides.add(nextIndex);
+        void call<SceneSlide>("compile_project_scene_slide", {
+          path: selectedProjectPath,
+          index: nextIndex,
+        })
+          .then((compiledSlide) => {
+            updateScene((current) =>
+              current
+                ? mergeCompiledSceneSlide(current, compiledSlide)
+                : current,
+            );
+          })
+          .catch((cause) => {
+            const message =
+              cause instanceof Error
+                ? cause.message
+                : "Failed to compile slide scene.";
+            console.log(message);
+            updateScene((current) =>
+              current
+                ? markSceneSlideError(current, nextIndex, message)
+                : current,
+            );
+          })
+          .finally(() => {
+            runningSlides.delete(nextIndex);
+            pumpSlideQueue();
+          });
+      }
+    };
+
+    sceneCompilePumpRef.current = pumpSlideQueue;
+
+    void call<ProjectSceneManifest>("compile_project_scene_manifest", {
+      path: selectedProjectPath,
+    })
+      .then((manifest) => {
+        if (!isCurrentRequest()) {
+          return;
+        }
+
+        setProjectScene(createPreviewProjectScene(manifest));
+        pendingSlides.push(
+          ...prioritizeSceneSlideIndices(
+            manifest.slide_count,
+            sceneCompilePriorityIndexRef.current,
+          ),
+        );
+        manifestReady = true;
+        pumpSlideQueue();
+      })
+      .catch((cause) => {
+        if (!isCurrentRequest()) {
+          return;
+        }
+        const message =
+          cause instanceof Error
+            ? cause.message
+            : "Failed to compile project scene.";
+        console.log(message);
+        setProjectScene(null);
+        setProjectSceneError(message);
+        sceneCompilePumpRef.current = null;
+      });
+
+    return () => {
+      cancelled = true;
+      if (sceneCompileRequestIdRef.current === requestId) {
+        sceneCompilePumpRef.current = null;
+        sceneSessionIdRef.current = "";
+      }
+    };
+  }, [selectedProject?.path, selectedProjectDetail?.updated_at]);
+
+  useEffect(() => {
+    if (!(settingsOpen && settingsTab === "library")) {
+      return;
+    }
+
+    let cancelled = false;
+    setComponentCatalogLoading(true);
+    setComponentCatalogError("");
+
+    call<ComponentCatalog>("get_component_catalog")
+      .then((catalog) => {
+        if (cancelled) {
+          return;
+        }
+        setComponentCatalog(catalog);
+        setSelectedComponentName((current) => {
+          if (catalog.items.some((entry) => entry.name === current)) {
+            return current;
+          }
+          return catalog.items[0]?.name || "";
+        });
+      })
+      .catch((cause) => {
+        if (cancelled) {
+          return;
+        }
+        const message =
+          cause instanceof Error
+            ? cause.message
+            : "Failed to load component library.";
+        console.log(message);
+        setComponentCatalog(null);
+        setComponentCatalogError(message);
+        setSelectedComponentName("");
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setComponentCatalogLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [settingsOpen, settingsTab]);
+
+  useEffect(() => {
+    if (!(settingsOpen && settingsTab === "library" && selectedComponentName)) {
+      setComponentTemplateLoading(false);
+      setComponentTemplateError("");
+      if (!selectedComponentName) {
+        setSelectedComponentTemplate(null);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    setComponentTemplateLoading(true);
+    setComponentTemplateError("");
+    setSelectedComponentTemplate(null);
+
+    call<DesignTemplate>("get_component_template", {
+      name: selectedComponentName,
+    })
+      .then((template) => {
+        if (!cancelled) {
+          setSelectedComponentTemplate(template);
+        }
+      })
+      .catch((cause) => {
+        if (cancelled) {
+          return;
+        }
+        const message =
+          cause instanceof Error
+            ? cause.message
+            : "Failed to load component template.";
+        console.log(message);
+        setComponentTemplateError(message);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setComponentTemplateLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedComponentName, settingsOpen, settingsTab]);
 
   useEffect(() => {
     if (!selectedProject) {
@@ -1405,7 +3596,9 @@ export default function Home() {
           setSlideTokens({ ...DEFAULT_TOKENS });
         }
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [selectedProject?.path]);
 
   useEffect(() => {
@@ -1417,7 +3610,9 @@ export default function Home() {
       document.head.appendChild(style);
     }
     style.textContent = projectCss;
-    return () => { style?.remove(); };
+    return () => {
+      style?.remove();
+    };
   }, [projectCss]);
 
   useEffect(() => {
@@ -1437,12 +3632,15 @@ export default function Home() {
     if (!container) {
       return -1;
     }
-    const slides = Array.from(container.querySelectorAll<HTMLElement>(".embedded-preview-deck .slide"));
+    const slides = Array.from(
+      container.querySelectorAll<HTMLElement>(".embedded-preview-deck .slide"),
+    );
     if (slides.length === 0) {
       return -1;
     }
 
-    const viewportCenterY = container.getBoundingClientRect().top + container.clientHeight / 2;
+    const viewportCenterY =
+      container.getBoundingClientRect().top + container.clientHeight / 2;
     let nextIndex = 0;
     let minDistance = Number.POSITIVE_INFINITY;
 
@@ -1461,12 +3659,17 @@ export default function Home() {
     return nextIndex;
   }
 
-  function scrollListToSlide(index: number, behavior: ScrollBehavior = "smooth"): void {
+  function scrollListToSlide(
+    index: number,
+    behavior: ScrollBehavior = "smooth",
+  ): void {
     const container = previewSurfaceRef.current;
     if (!container) {
       return;
     }
-    const target = container.querySelector<HTMLElement>(`.embedded-preview-deck .slide[data-slide-index="${index}"]`);
+    const target = container.querySelector<HTMLElement>(
+      `.embedded-preview-deck .slide[data-slide-index="${index}"]`,
+    );
     if (!target) {
       return;
     }
@@ -1500,7 +3703,9 @@ export default function Home() {
       rafId = 0;
       const nextIndex = getCurrentCenteredSlideIndex();
       if (nextIndex >= 0) {
-        setActiveSlideIndex((previous) => (previous === nextIndex ? previous : nextIndex));
+        setActiveSlideIndex((previous) =>
+          previous === nextIndex ? previous : nextIndex,
+        );
       }
     };
 
@@ -1529,7 +3734,9 @@ export default function Home() {
     setAppState(nextState);
 
     const fallbackPath = nextState.projects[0]?.path || "";
-    const hasPreferred = preferredPath && nextState.projects.some((item) => item.path === preferredPath);
+    const hasPreferred =
+      preferredPath &&
+      nextState.projects.some((item) => item.path === preferredPath);
     const nextSelection = hasPreferred ? preferredPath : fallbackPath;
     setSelectedPath(nextSelection);
     return nextSelection;
@@ -1540,13 +3747,25 @@ export default function Home() {
 
     async function boot() {
       try {
-        await refreshState();
+        const initialDeckPath = initialPreviewRoute.deckPath;
+
+        if (initialDeckPath) {
+          const opened = await call<ProjectDetail>("open_project", {
+            path: initialDeckPath,
+          });
+          await refreshState(opened.path);
+        } else {
+          await refreshState();
+        }
         if (!cancelled) {
           console.log("Ready");
         }
       } catch (error) {
         if (!cancelled) {
-          const message = error instanceof Error ? error.message : "Failed to load app state.";
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Failed to load app state.";
           console.log(message);
         }
       }
@@ -1557,7 +3776,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialPreviewRoute.deckPath]);
 
   useEffect(() => {
     return () => {
@@ -1577,9 +3796,12 @@ export default function Home() {
     async function registerMenuListener() {
       try {
         const { listen } = await import("@tauri-apps/api/event");
-        const cleanupOpenSettings = await listen(OPEN_SETTINGS_MENU_EVENT, () => {
-          openSettingsPanel();
-        });
+        const cleanupOpenSettings = await listen(
+          OPEN_SETTINGS_MENU_EVENT,
+          () => {
+            openSettingsPanel();
+          },
+        );
         const cleanupExportSkill = await listen(EXPORT_SKILL_MENU_EVENT, () => {
           void handleExportSkillArchive();
         });
@@ -1596,7 +3818,9 @@ export default function Home() {
         };
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : "Failed to register application menu listener.";
+          error instanceof Error
+            ? error.message
+            : "Failed to register application menu listener.";
         console.log(message);
       }
     }
@@ -1621,25 +3845,41 @@ export default function Home() {
       const target = event.target as HTMLElement | null;
       const targetTag = target?.tagName;
       const isTypingTarget =
-        Boolean(target?.isContentEditable) || targetTag === "INPUT" || targetTag === "TEXTAREA" || targetTag === "SELECT";
+        Boolean(target?.isContentEditable) ||
+        targetTag === "INPUT" ||
+        targetTag === "TEXTAREA" ||
+        targetTag === "SELECT";
       if (isTypingTarget) {
         return;
       }
 
-      if (usingCommand && (event.key === "=" || event.key === "+" || event.key === "Add")) {
+      if (
+        usingCommand &&
+        (event.key === "=" || event.key === "+" || event.key === "Add")
+      ) {
         event.preventDefault();
-        setPreviewZoom((previous) => clampPreviewZoom(previous + PREVIEW_ZOOM_STEP));
+        setPreviewZoom((previous) =>
+          clampPreviewZoom(previous + PREVIEW_ZOOM_STEP),
+        );
         return;
       }
 
-      if (usingCommand && (event.key === "-" || event.key === "_" || event.key === "Subtract")) {
+      if (
+        usingCommand &&
+        (event.key === "-" || event.key === "_" || event.key === "Subtract")
+      ) {
         event.preventDefault();
-        setPreviewZoom((previous) => clampPreviewZoom(previous - PREVIEW_ZOOM_STEP));
+        setPreviewZoom((previous) =>
+          clampPreviewZoom(previous - PREVIEW_ZOOM_STEP),
+        );
         return;
       }
 
       if (usingCommand && (event.key === "b" || event.key === "B")) {
         event.preventDefault();
+        if (settingsOpen) {
+          return;
+        }
         setSidebarOpen((open) => !open);
         return;
       }
@@ -1674,9 +3914,15 @@ export default function Home() {
         return;
       }
 
-      if (event.key === "ArrowRight" || event.key === "PageDown" || event.key === " ") {
+      if (
+        event.key === "ArrowRight" ||
+        event.key === "PageDown" ||
+        event.key === " "
+      ) {
         event.preventDefault();
-        setActiveSlideIndex((previous) => Math.min(previous + 1, maxSlideIndex));
+        setActiveSlideIndex((previous) =>
+          Math.min(previous + 1, maxSlideIndex),
+        );
         return;
       }
 
@@ -1690,7 +3936,14 @@ export default function Home() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [activeSlideIndex, expandedAsset, maxSlideIndex, presenterMode, selectedProject, settingsOpen]);
+  }, [
+    activeSlideIndex,
+    expandedAsset,
+    maxSlideIndex,
+    presenterMode,
+    selectedProject,
+    settingsOpen,
+  ]);
 
   function clearPreviewDockHideTimer(): void {
     if (previewDockHideTimerRef.current !== null) {
@@ -1732,7 +3985,9 @@ export default function Home() {
     revealPreviewDock();
   }
 
-  function handlePreviewStagePointerMove(event: ReactPointerEvent<HTMLDivElement>): void {
+  function handlePreviewStagePointerMove(
+    event: ReactPointerEvent<HTMLDivElement>,
+  ): void {
     const stageBounds = event.currentTarget.getBoundingClientRect();
     const distanceFromBottom = stageBounds.bottom - event.clientY;
     if (distanceFromBottom <= 148) {
@@ -1789,13 +4044,17 @@ export default function Home() {
 
   async function handleOpenProjectFolder(): Promise<void> {
     await withBusy(async () => {
-      const folder = await pickFolder("Select a project folder containing page.mdx");
+      const folder = await pickFolder(
+        "Select a project folder containing page.mdx",
+      );
       if (!folder) {
         console.log("Open project cancelled.");
         return;
       }
 
-      const opened = await call<ProjectDetail>("open_project", { path: folder });
+      const opened = await call<ProjectDetail>("open_project", {
+        path: folder,
+      });
       await refreshState(opened.path);
       console.log(`Opened project ${opened.name}.`);
     });
@@ -1808,7 +4067,9 @@ export default function Home() {
 
       const fallbackPath = nextState.projects[0]?.path || "";
       const preferredPath = selectedPath === path ? "" : selectedPath;
-      const hasPreferred = preferredPath && nextState.projects.some((project) => project.path === preferredPath);
+      const hasPreferred =
+        preferredPath &&
+        nextState.projects.some((project) => project.path === preferredPath);
       const nextSelection = hasPreferred ? preferredPath : fallbackPath;
       setSelectedPath(nextSelection);
 
@@ -1827,13 +4088,17 @@ export default function Home() {
     }
   }
 
-  function openSettingsPanel(): void {
+  function openSettingsPanel(nextTab: SettingsTab = "theme"): void {
     setExpandedAsset(null);
+    setSettingsTab(nextTab);
     setSettingsOpen(true);
     setSidebarOpen(true);
   }
 
-  function updateToken<K extends keyof SlideTokens>(key: K, value: string): void {
+  function updateToken<K extends keyof SlideTokens>(
+    key: K,
+    value: string,
+  ): void {
     setSlideTokens((prev) => {
       const next = { ...prev, [key]: value };
       const css = tokensToCss(next);
@@ -1884,7 +4149,9 @@ export default function Home() {
     });
   }
 
-  function handleSidebarResizeStart(event: ReactPointerEvent<HTMLDivElement>): void {
+  function handleSidebarResizeStart(
+    event: ReactPointerEvent<HTMLDivElement>,
+  ): void {
     if (!sidebarOpen) {
       return;
     }
@@ -1957,13 +4224,19 @@ export default function Home() {
     >
       <SidebarToggleButton
         sidebarOpen={sidebarOpen}
-        onToggle={() => setSidebarOpen((open) => !open)}
+        disabled={settingsOpen}
+        onToggle={() => {
+          if (!settingsOpen) {
+            setSidebarOpen((open) => !open);
+          }
+        }}
       />
 
       <AppSidebar
         busy={busy}
         sidebarOpen={sidebarOpen}
         settingsOpen={settingsOpen}
+        settingsTab={settingsTab}
         projectsCount={projects.length}
         projects={projects}
         pinnedPaths={appState?.config.pinned_projects || []}
@@ -1979,7 +4252,8 @@ export default function Home() {
         onTogglePin={(path) => {
           void handleTogglePin(path);
         }}
-        onOpenSettings={openSettingsPanel}
+        onOpenSettings={() => openSettingsPanel("theme")}
+        onSelectSettingsTab={setSettingsTab}
       />
 
       <SidebarResizer
@@ -1999,7 +4273,8 @@ export default function Home() {
         deckPreview={
           selectedProject ? (
             <EmbeddedDeckPreview
-              source={selectedProjectEmbeddedSource}
+              scene={projectScene}
+              error={projectSceneError}
               projectPath={selectedProject.path}
               mermaidThemeName={mermaidThemeName}
               syntaxThemeName={syntaxThemeName}
@@ -2018,6 +4293,7 @@ export default function Home() {
         slideTocEntries={slideTocEntries}
         activeSlideIndex={activeSlideIndex}
         onTocSelect={handleTocSelect}
+        previewStatusLabel={previewStatusLabel}
         previewDockVisible={previewDockVisible}
         onPreviewDockPointerEnter={handlePreviewDockPointerEnter}
         onPreviewDockPointerLeave={handlePreviewDockPointerLeave}
@@ -2036,6 +4312,7 @@ export default function Home() {
       <SettingsOverlay
         open={settingsOpen}
         busy={busy}
+        settingsTab={settingsTab}
         theme={theme}
         onThemeChange={(nextTheme) => setTheme(nextTheme)}
         mermaidThemeName={mermaidThemeName}
@@ -2056,7 +4333,9 @@ export default function Home() {
         }}
         selectedProject={Boolean(selectedProject)}
         slideTokens={slideTokens}
-        onUpdateToken={(key, value) => updateToken(key as keyof SlideTokens, value)}
+        onUpdateToken={(key, value) =>
+          updateToken(key as keyof SlideTokens, value)
+        }
         onSaveCss={() => {
           void handleSaveCss();
         }}
@@ -2065,6 +4344,14 @@ export default function Home() {
         fontLabel={fontLabel}
         hexForInput={hexForInput}
         isHexColor={isHexColor}
+        componentCatalog={componentCatalog?.items || []}
+        componentCatalogLoading={componentCatalogLoading}
+        componentCatalogError={componentCatalogError}
+        selectedComponentName={selectedComponentName}
+        onSelectComponent={setSelectedComponentName}
+        selectedComponentTemplate={selectedComponentTemplate}
+        componentTemplateLoading={componentTemplateLoading}
+        componentTemplateError={componentTemplateError}
       />
     </main>
   );
