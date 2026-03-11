@@ -15,7 +15,7 @@ This avoids Apple Developer enrollment, but it does not avoid Gatekeeper entirel
   - default: `https://github.com/kristianernst/fast-slides/releases/latest/download/latest.json`
   - override at build time with `FASTSLIDES_UPDATE_ENDPOINT`
 - Update public key:
-  - required at build time as `FASTSLIDES_UPDATE_PUBKEY`
+  - checked into the repo for release builds
 - Ad-hoc macOS signing:
   - configured via `bundle.macOS.signingIdentity = "-"` in [tauri.conf.json](/Users/kristianernst/work/dev/tooling/fast-slides/fastslides-desktop/src-tauri/tauri.conf.json)
 
@@ -30,7 +30,7 @@ npx tauri signer generate -w ~/.fastslides/fastslides-updater.key
 
 Keep the private key contents for GitHub secret `TAURI_SIGNING_PRIVATE_KEY`.
 Keep the password for `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
-Copy the printed public key into repository variable `FASTSLIDES_UPDATE_PUBKEY`.
+The public key is safe to keep in the repo and is already wired into the app config.
 
 2. Add GitHub Actions secrets and variables.
 
@@ -38,10 +38,6 @@ Required secret:
 
 - `TAURI_SIGNING_PRIVATE_KEY`
 - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`
-
-Required variable:
-
-- `FASTSLIDES_UPDATE_PUBKEY`
 
 Optional variable:
 

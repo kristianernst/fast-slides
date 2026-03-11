@@ -4162,7 +4162,7 @@ export default function Home() {
       if (!silent) {
         setUpdateNotice(
           !next.configured
-            ? "App updates activate in release builds with the updater key."
+            ? "App updates activate in release builds."
             : next.available
               ? `FastSlides ${next.version} is ready to install.`
               : `FastSlides ${next.currentVersion} is current.`,

@@ -11,6 +11,8 @@ use crate::runtime::open_in_file_manager as open_in_file_manager_service;
 
 const DEFAULT_UPDATE_ENDPOINT: &str =
     "https://github.com/kristianernst/fast-slides/releases/latest/download/latest.json";
+const DEFAULT_UPDATE_PUBKEY: &str =
+    "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDY3Q0I1RTY1NkQ3MTBEQTkKUldTcERYRnRaVjdMWnp0eHZrd3pDQjhBazQyVVFURlBiUWJQa0ZGYzZqL0I4eTdoUlZlZFEwTWgK";
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,15 +40,15 @@ fn update_endpoint() -> &'static str {
         .unwrap_or(DEFAULT_UPDATE_ENDPOINT)
 }
 
-fn update_pubkey() -> Option<&'static str> {
+fn update_pubkey() -> &'static str {
     option_env!("FASTSLIDES_UPDATE_PUBKEY")
         .map(str::trim)
         .filter(|value| !value.is_empty())
+        .unwrap_or(DEFAULT_UPDATE_PUBKEY)
 }
 
 fn build_updater(app: &tauri::AppHandle) -> Result<tauri_plugin_updater::Updater, String> {
-    let pubkey = update_pubkey()
-        .ok_or_else(|| "App updates are not configured for this build.".to_string())?;
+    let pubkey = update_pubkey();
     let endpoint = update_endpoint()
         .parse::<Url>()
         .map_err(|error| format!("Invalid update endpoint: {error}"))?;
@@ -67,17 +69,6 @@ pub(crate) fn open_in_file_manager(path: String) -> Result<(), String> {
 #[tauri::command]
 pub(crate) async fn check_app_update(app: tauri::AppHandle) -> Result<AppUpdateStatus, String> {
     let current_version = app.package_info().version.to_string();
-
-    if update_pubkey().is_none() {
-        return Ok(AppUpdateStatus {
-            configured: false,
-            current_version,
-            available: false,
-            version: None,
-            date: None,
-            body: None,
-        });
-    }
 
     let update = build_updater(&app)?
         .check()

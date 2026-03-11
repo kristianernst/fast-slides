@@ -1,6 +1,6 @@
 [package]
 name = "fastslides_desktop"
-version = "0.1.5"
+version = "0.1.6"
 description = "FastSlides desktop inspector"
 authors = ["kristianernst"]
 license = ""

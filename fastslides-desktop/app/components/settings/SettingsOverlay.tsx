@@ -1191,7 +1191,7 @@ export function SettingsOverlay({
                         {!appUpdate
                           ? "Checking release status for this build."
                           : !appUpdate.configured
-                            ? "Updates are enabled only in release builds with the updater key."
+                            ? "Updates are enabled only in release builds."
                             : appUpdate.available
                               ? `FastSlides ${appUpdate.version} is ready to install.`
                               : `FastSlides ${appUpdate.currentVersion} is current.`}
